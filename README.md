@@ -97,9 +97,9 @@ Takes Reels out of Instagram. Each part has its own switch on the patch's page i
 
 | Setting | Default | |
 |---|---|---|
-| Home feed | on | Drops reel posts and "Suggested reels" style units as the feed loads. |
-| Explore | on | Drops Explore grid sections that contain a reel. Whole sections go, since removing single tiles would break Instagram's grid layouts. |
-| Stop scrolling | on | A reel opened from a message or a profile plays alone, with swiping to the next one locked. |
+| Home feed | off | Drops reel posts and "Suggested reels" style units as the feed loads. |
+| Explore | off | Drops Explore grid sections that contain a reel. Whole sections go, since removing single tiles would break Instagram's grid layouts. |
+| Stop scrolling | off | A reel opened from a message or a profile plays alone, with swiping to the next one locked. |
 | Block Reels player | off | Reels don't open at all, including ones sent in messages. |
 
 <details>

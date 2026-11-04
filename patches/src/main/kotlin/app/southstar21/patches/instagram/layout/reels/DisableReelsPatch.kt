@@ -15,7 +15,7 @@ private fun stub(name: String) = extensionStub(EXTENSION_CLASS, name)
 val disableReelsPatch = bytecodePatch(
     name = "Disable Reels",
     description = "Removes reels from the home feed and Explore, " +
-            "and stops scrolling from one reel to the next. Each part can be switched off in the settings.",
+            "and stops scrolling from one reel to the next. Each part is off until you switch it on in the settings.",
     default = true
 ) {
     compatibleWith(COMPATIBILITY_INSTAGRAM)
