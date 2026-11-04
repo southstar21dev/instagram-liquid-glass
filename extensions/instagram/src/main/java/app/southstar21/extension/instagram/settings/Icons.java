@@ -8,6 +8,7 @@ import android.graphics.Path;
 import android.graphics.PixelFormat;
 import android.graphics.RectF;
 import android.graphics.Shader;
+import android.graphics.Typeface;
 import android.graphics.drawable.Drawable;
 
 /** Icons for the menu, drawn in code so the extension needs no resources. */
@@ -32,6 +33,8 @@ public final class Icons {
         NO_REELS,
         /** A portrait in a frame, for profile pictures. */
         PICTURE,
+        /** An "Ad" badge crossed out, for removing ads. */
+        NO_ADS,
     }
 
     /** A white glyph on a rounded square filled with a soft gradient of {@code color}. */
@@ -161,6 +164,16 @@ public final class Icons {
                     path.cubicTo(s * 0.36f, s * 0.57f, s * 0.64f, s * 0.57f, s * 0.66f, s * 0.68f);
                     path.close();
                     canvas.drawPath(path, solid);
+                    break;
+                }
+                case NO_ADS: {
+                    rect.set(s * 0.22f, s * 0.3f, s * 0.78f, s * 0.7f);
+                    canvas.drawRoundRect(rect, s * 0.1f, s * 0.1f, stroke);
+                    solid.setTextSize(s * 0.24f);
+                    solid.setTextAlign(Paint.Align.CENTER);
+                    solid.setTypeface(Typeface.DEFAULT_BOLD);
+                    canvas.drawText("Ad", s * 0.5f, s * 0.5f - (solid.ascent() + solid.descent()) / 2f, solid);
+                    canvas.drawLine(s * 0.2f, s * 0.8f, s * 0.8f, s * 0.2f, stroke);
                     break;
                 }
                 case PATCH:

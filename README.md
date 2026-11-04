@@ -109,6 +109,24 @@ Instagram parses every home feed item, and every Explore section, through one me
 
 </details>
 
+### Hide ads
+
+Takes ads out of Instagram. Each part has its own switch on the patch's page in the [settings menu](#settings-menu).
+
+| Setting | Default | |
+|---|---|---|
+| Sponsored posts | on | Ads in the home feed, Stories, Reels and feeds opened from Explore. |
+| Ad units in the feed | on | Ad carousels and "Why am I seeing ads" prompts that come with the home feed. |
+
+Ads Instagram had already loaded may still show once after switching it on.
+
+<details>
+<summary>How it works</summary>
+
+Feed, Stories, Reels and the other feeds share one sponsored content controller, which receives every batch of ads Instagram fetches and slots them between posts. The patch empties each batch on arrival, which Instagram handles as a delivery with no ads. Ad units that come inside the home feed response (`AD`, ad pivots, ads feedback prompts) are dropped where each feed item is parsed, the same method Disable Reels uses.
+
+</details>
+
 ### View profile picture
 
 A small round button sits on the bottom left of the profile picture on every profile page, however it's opened: search, DMs, notifications or your own profile, where the story "+" stays on the bottom right.
