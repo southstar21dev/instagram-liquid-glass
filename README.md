@@ -43,7 +43,7 @@ Patched apps are signed with a different key, so uninstall the Play Store versio
 ## Patches
 
 <!-- PATCHES_START EXPANDED -->
-> **[v1.8.1](https://github.com/southstar21dev/southstar21-patches/releases/tag/v1.8.1)**&nbsp;&nbsp;•&nbsp;&nbsp;`main`&nbsp;&nbsp;•&nbsp;&nbsp;6 patches total
+> **[v1.0.0](https://github.com/southstar21dev/southstar21-patches/releases/tag/v1.0.0)**&nbsp;&nbsp;•&nbsp;&nbsp;`main`&nbsp;&nbsp;•&nbsp;&nbsp;6 patches total
 <details open>
 <summary>📦 Instagram&nbsp;&nbsp;•&nbsp;&nbsp;6 patches</summary>
 <br>
@@ -60,7 +60,7 @@ Patched apps are signed with a different key, so uninstall the Play Store versio
 | [Hide navigation buttons](#hide-navigation-buttons) | Adds settings to hide Search, Reels, Create, Messages and other tabs from the bottom bar. |  |
 | [Liquid Glass navigation bar](#liquid-glass-navigation-bar) | Turns the bottom tab bar into a floating iOS 26 style Liquid Glass pill with live background blur and edge refraction. Refraction needs Android 13+, blur needs Android 12+, older versions get a tinted pill. | • Blur radius<br>• Refraction strength<br>• Extend content behind bar |
 | [Remove build expired popup](#remove-build-expired-popup) | Removes the popup that appears after a while, when the app version ages. |  |
-| [View profile picture](#view-profile-picture) | Adds a button to profile pages that shows the profile picture in full resolution and saves it to the gallery. |  |
+| [View profile picture](#view-profile-picture) | Adds a button on the profile picture of profile pages that shows the profile picture in full resolution and saves it to the gallery. |  |
 
 </details>
 

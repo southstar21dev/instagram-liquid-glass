@@ -211,7 +211,7 @@
     },
     {
       "name": "View profile picture",
-      "description": "Adds a button to profile pages that shows the profile picture in full resolution and saves it to the gallery.",
+      "description": "Adds a button on the profile picture of profile pages that shows the profile picture in full resolution and saves it to the gallery.",
       "default": true,
       "category": null,
       "compatiblePackages": [

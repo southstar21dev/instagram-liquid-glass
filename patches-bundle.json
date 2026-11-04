@@ -1,7 +1,7 @@
 {
-  "created_at": "2026-11-04T18:06:33",
-  "description": "## [1.8.1](https://github.com/southstar21dev/southstar21-patches/compare/v1.8.0...v1.8.1) (2026-11-04)\n\n### 🐛 Bug Fixes\n\n* Open the full size profile picture from a button in the profile page's top bar instead of a long press ([d3b1bb6](https://github.com/southstar21dev/southstar21-patches/commit/d3b1bb6f98c344b94752a61507bddf58f05eb46a))",
-  "download_url": "https://github.com/southstar21dev/southstar21-patches/releases/download/v1.8.1/patches-1.8.1.mpp",
+  "created_at": "2026-11-04T20:45:18",
+  "description": "## 1.0.0 (2026-11-04)\n\n### ✨ New Features\n\n* southstar21 Patches for Instagram ([8cc3fc7](https://github.com/southstar21dev/southstar21-patches/commit/8cc3fc728bb2a19458faec2be9f79ea4f697f89c))",
+  "download_url": "https://github.com/southstar21dev/southstar21-patches/releases/download/v1.0.0/patches-1.0.0.mpp",
   "signature_download_url": "",
-  "version": "1.8.1"
+  "version": "1.0.0"
 }
