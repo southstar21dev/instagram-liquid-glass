@@ -2,7 +2,7 @@
 
 ### ✨ New Features
 
-* Conscious gate patch ([6945055](https://github.com/southstar21dev/southstar21-patches/commit/69450557e133922bb126adc09507f12d04ac30b3))
+* Conscious gate patch ([6945055](https://github.com/southstar21dev/southstar21-patches/commit/69450557e133922bb126adc09507f12d04ac30b3)): a daily time budget for the home feed, Reels, Explore, stories and post feeds (20 minutes on weekdays and 30 at the weekend by default). In the last 15 seconds the screens frost over and can only be scrolled, then a gate closes them until the next day and pauses Reels and stories. Messages, searching for people and profiles always keep working. The gate can give you a few extra minutes after a short countdown, a limited number of times per day, and quiet hours and a morning start can keep the screens closed at set times. Each screen and every setting can be changed in the settings menu.
 * **Conscious gate:** Frost only the last 15 seconds ([1b39d0a](https://github.com/southstar21dev/southstar21-patches/commit/1b39d0ad93ac59fc2c242b8b60022c6d2b68b32c))
 * **Conscious gate:** Gate stories and post feeds, pause Reels in place ([b56a293](https://github.com/southstar21dev/southstar21-patches/commit/b56a29321a2e0d9bdbf20826fdda978906063356))
 * Support Instagram 454.0.0.54.77 ([b119065](https://github.com/southstar21dev/southstar21-patches/commit/b119065289776c68d1824dd205fa5b8613d940e3))
