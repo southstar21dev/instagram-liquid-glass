@@ -1,7 +1,7 @@
 {
-  "created_at": "2026-11-13T23:34:16",
-  "description": "## [1.2.0-dev.2](https://github.com/southstar21dev/southstar21-patches/compare/v1.2.0-dev.1...v1.2.0-dev.2) (2026-11-13)\n\n### 🐛 Bug Fixes\n\n* **Conscious gate:** Add the missing space in the description ([a7e1ef3](https://github.com/southstar21dev/southstar21-patches/commit/a7e1ef34bb64a5d595a466dd55de21aeebc69711))\n* **Disable Reels:** Patch with Morphe Manager 2.5.0 ([e7cb329](https://github.com/southstar21dev/southstar21-patches/commit/e7cb329169059562619b98c81acd644404393b8a))\n\n### ✨ New Features\n\n* **Settings:** What is this? page for each patch ([b4f4e07](https://github.com/southstar21dev/southstar21-patches/commit/b4f4e07cf5a53a1e46bfdbbfc760e4be89c3c583))",
-  "download_url": "https://github.com/southstar21dev/southstar21-patches/releases/download/v1.2.0-dev.2/patches-1.2.0-dev.2.mpp",
+  "created_at": "2026-11-13T23:48:38",
+  "description": "## [1.2.0-dev.3](https://github.com/southstar21dev/southstar21-patches/compare/v1.2.0-dev.2...v1.2.0-dev.3) (2026-11-13)\n\n### 🐛 Bug Fixes\n\n* **Disable Reels:** Patch every build of Instagram 454 ([c4346f9](https://github.com/southstar21dev/southstar21-patches/commit/c4346f9c3a69329fa82fcd3c8fc859a4bf26d55d))",
+  "download_url": "https://github.com/southstar21dev/southstar21-patches/releases/download/v1.2.0-dev.3/patches-1.2.0-dev.3.mpp",
   "signature_download_url": "",
-  "version": "1.2.0-dev.2"
+  "version": "1.2.0-dev.3"
 }

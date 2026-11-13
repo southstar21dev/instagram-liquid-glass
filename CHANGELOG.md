@@ -1,3 +1,9 @@
+## [1.2.0-dev.3](https://github.com/southstar21dev/southstar21-patches/compare/v1.2.0-dev.2...v1.2.0-dev.3) (2026-11-13)
+
+### 🐛 Bug Fixes
+
+* **Disable Reels:** Patch every build of Instagram 454 ([c4346f9](https://github.com/southstar21dev/southstar21-patches/commit/c4346f9c3a69329fa82fcd3c8fc859a4bf26d55d))
+
 ## [1.2.0-dev.2](https://github.com/southstar21dev/southstar21-patches/compare/v1.2.0-dev.1...v1.2.0-dev.2) (2026-11-13)
 
 ### 🐛 Bug Fixes
