@@ -15,6 +15,7 @@ import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.GradientDrawable;
 import android.graphics.drawable.RippleDrawable;
 import android.os.SystemClock;
+import android.text.InputFilter;
 import android.text.TextUtils;
 import android.util.TypedValue;
 import android.view.Gravity;
@@ -23,6 +24,7 @@ import android.view.ViewGroup;
 import android.view.Window;
 import android.view.animation.DecelerateInterpolator;
 import android.view.animation.PathInterpolator;
+import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
@@ -30,6 +32,7 @@ import android.widget.ScrollView;
 import android.widget.SeekBar;
 import android.widget.Switch;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -306,9 +309,15 @@ public final class SettingsMenu {
             for (int i = 0; i < group.settings.size(); i++) {
                 Setting setting = group.settings.get(i);
                 if (i > 0) groupCard.addView(dividerView(false));
-                groupCard.addView(setting instanceof IntSetting
-                        ? sliderRow((IntSetting) setting)
-                        : switchRow((BooleanSetting) setting, setting.title, setting.summary, null));
+                if (setting instanceof StringSetting) {
+                    groupCard.addView(textRow((StringSetting) setting));
+                } else if (setting instanceof ActionSetting) {
+                    groupCard.addView(buttonRow((ActionSetting) setting));
+                } else if (setting instanceof IntSetting) {
+                    groupCard.addView(sliderRow((IntSetting) setting));
+                } else {
+                    groupCard.addView(switchRow((BooleanSetting) setting, setting.title, setting.summary, null));
+                }
             }
             list.addView(groupCard);
             dependent.add(headerView);
@@ -439,6 +448,59 @@ public final class SettingsMenu {
         row.addView(label, lp);
         row.setBackground(ripple());
         row.setOnClickListener(v -> onClick.run());
+        return row;
+    }
+
+    private View textRow(StringSetting setting) {
+        LinearLayout row = rowContainer(dp(52));
+        String current = setting.get();
+        LinearLayout labels = labels(setting.title,
+                TextUtils.isEmpty(current) ? setting.summary : "\u201C" + current + "\u201D", false);
+        row.addView(labels, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        ImageView chevron = new ImageView(activity);
+        chevron.setImageDrawable(Icons.chevron(textTertiary, density, false));
+        row.addView(chevron, new LinearLayout.LayoutParams(dp(12), dp(20)));
+        row.setBackground(ripple());
+        row.setOnClickListener(v -> {
+            EditText input = new EditText(activity);
+            input.setText(current);
+            input.setHint(setting.hint);
+            input.setSingleLine(false);
+            input.setMaxLines(3);
+            input.setFilters(new InputFilter[]{new InputFilter.LengthFilter(setting.maxLength)});
+            input.setSelection(input.getText().length());
+            FrameLayout box = new FrameLayout(activity);
+            box.setPadding(dp(20), dp(8), dp(20), 0);
+            box.addView(input);
+            new AlertDialog.Builder(activity, dark
+                    ? android.R.style.Theme_DeviceDefault_Dialog_Alert
+                    : android.R.style.Theme_DeviceDefault_Light_Dialog_Alert)
+                    .setTitle(setting.title)
+                    .setView(box)
+                    .setNegativeButton("Cancel", null)
+                    .setNeutralButton("Clear", (d, w) -> {
+                        setting.set("");
+                        replaceTop();
+                    })
+                    .setPositiveButton("Save", (d, w) -> {
+                        setting.set(input.getText().toString().trim());
+                        replaceTop();
+                    })
+                    .show();
+        });
+        return row;
+    }
+
+    private View buttonRow(ActionSetting setting) {
+        LinearLayout row = rowContainer(dp(52));
+        LinearLayout labels = labels(setting.title, setting.summary, false);
+        ((TextView) labels.getChildAt(0)).setTextColor(ACCENT);
+        row.addView(labels, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        row.setBackground(ripple());
+        row.setOnClickListener(v -> {
+            String message = setting.action.run();
+            if (message != null) Toast.makeText(activity, message, Toast.LENGTH_SHORT).show();
+        });
         return row;
     }
 
@@ -702,7 +764,9 @@ public final class SettingsMenu {
 
     private static String format(IntSetting setting, int value) {
         if (setting.unit == null) return String.valueOf(value);
-        return "%".equals(setting.unit) ? value + "%" : value + " " + setting.unit;
+        // Units like "%", ":00" or "×" go straight after the number.
+        boolean attached = "%".equals(setting.unit) || setting.unit.startsWith(":") || "×".equals(setting.unit);
+        return attached ? value + setting.unit : value + " " + setting.unit;
     }
 
     private int dp(int value) {
