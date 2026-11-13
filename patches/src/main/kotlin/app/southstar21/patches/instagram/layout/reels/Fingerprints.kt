@@ -2,8 +2,12 @@ package app.southstar21.patches.instagram.layout.reels
 
 import app.morphe.patcher.Fingerprint
 import app.morphe.patcher.methodCall
+import app.morphe.patcher.patch.PatchException
 import com.android.tools.smali.dexlib2.AccessFlags
 import com.android.tools.smali.dexlib2.Opcode
+import com.android.tools.smali.dexlib2.iface.Method
+import com.android.tools.smali.dexlib2.iface.instruction.ReferenceInstruction
+import com.android.tools.smali.dexlib2.iface.reference.MethodReference
 
 internal const val EXTENSION_CLASS =
     "Lapp/southstar21/extension/instagram/reels/DisableReelsPatch;"
@@ -27,16 +31,28 @@ internal object FeedItemTypeFingerprint : Fingerprint(
     },
 )
 
-/** FeedItem's null-safe getter for its media, the one that unwraps the content holder. */
-internal object FeedItemMediaFingerprint : Fingerprint(
-    classFingerprint = FeedItemTypeFingerprint,
-    accessFlags = listOf(AccessFlags.PUBLIC, AccessFlags.FINAL),
-    returnType = MEDIA_CLASS,
-    parameters = listOf(),
-    filters = listOf(
-        methodCall(opcode = Opcode.INVOKE_STATIC, returnType = MEDIA_CLASS),
-    ),
-)
+/**
+ * FeedItem's null-safe getter for its media, the one that unwraps the content holder:
+ * `public final ()Media`, which gets the media through a static call.
+ *
+ * Looked up in FeedItem's methods directly rather than with a class fingerprint. Hide ads and
+ * this patch change FeedItem, and Morphe Patcher 2.3.0 doesn't match a class fingerprint's
+ * method in a class that was already changed.
+ */
+internal fun feedItemMediaGetter(): Method {
+    val getters = FeedItemTypeFingerprint.originalClassDef.methods.filter { method ->
+        method.accessFlags == (AccessFlags.PUBLIC.value or AccessFlags.FINAL.value) &&
+                method.returnType == MEDIA_CLASS &&
+                method.parameterTypes.isEmpty() &&
+                method.implementation?.instructions?.any { instruction ->
+                    instruction.opcode == Opcode.INVOKE_STATIC &&
+                            ((instruction as? ReferenceInstruction)?.reference as? MethodReference)
+                                ?.returnType == MEDIA_CLASS
+                } == true
+    }
+    return getters.singleOrNull()
+        ?: throw PatchException("Expected one media getter in FeedItem, found ${getters.size}")
+}
 
 /** Parses one FeedItem from JSON. Every feed, and the feed cache, goes through it. */
 internal object ParseFeedItemFingerprint : Fingerprint(
