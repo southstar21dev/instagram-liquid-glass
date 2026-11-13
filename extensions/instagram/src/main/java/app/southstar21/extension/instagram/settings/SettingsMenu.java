@@ -294,6 +294,17 @@ public final class SettingsMenu {
             description.setPadding(dp(8), dp(4), dp(8), 0);
             header.addView(description);
         }
+        if (!TextUtils.isEmpty(patch.aboutWhat)) {
+            TextView about = text("What is this?", 15, ACCENT, false);
+            about.setGravity(Gravity.CENTER);
+            about.setPadding(dp(12), dp(6), dp(12), dp(6));
+            about.setBackground(ripple());
+            about.setOnClickListener(v -> push(() -> buildAboutPage(patch), true));
+            LinearLayout.LayoutParams aboutLp = new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            aboutLp.topMargin = dp(4);
+            header.addView(about, aboutLp);
+        }
         list.addView(header);
 
         List<View> dependent = new ArrayList<>();
@@ -361,6 +372,39 @@ public final class SettingsMenu {
         list.addView(reset);
 
         return page("Patches", list);
+    }
+
+    /** "What is this?": what a patch does and what it's for, in plain words. */
+    private View buildAboutPage(PatchSettings patch) {
+        LinearLayout list = pageList();
+
+        LinearLayout header = new LinearLayout(activity);
+        header.setOrientation(LinearLayout.VERTICAL);
+        header.setGravity(Gravity.CENTER_HORIZONTAL);
+        header.setPadding(dp(16), dp(8), dp(16), dp(8));
+        ImageView icon = new ImageView(activity);
+        icon.setImageDrawable(Icons.tile(patch.glyph, patch.color, density));
+        header.addView(icon, new LinearLayout.LayoutParams(dp(64), dp(64)));
+        TextView name = text(patch.title, 24, textPrimary, true);
+        name.setGravity(Gravity.CENTER);
+        name.setPadding(0, dp(12), 0, 0);
+        header.addView(name);
+        list.addView(header);
+
+        addAboutSection(list, "What it does", patch.aboutWhat);
+        addAboutSection(list, "What it's for", patch.aboutWhy);
+        return page(patch.title, list);
+    }
+
+    private void addAboutSection(LinearLayout list, String title, String body) {
+        if (TextUtils.isEmpty(body)) return;
+        list.addView(sectionHeader(title));
+        LinearLayout section = cardView();
+        TextView text = text(body, 16, textPrimary, false);
+        text.setLineSpacing(0, 1.2f);
+        text.setPadding(dp(16), dp(14), dp(16), dp(14));
+        section.addView(text);
+        list.addView(section);
     }
 
     /** Rebuilds the visible page in place, e.g. after a reset. */

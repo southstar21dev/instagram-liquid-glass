@@ -25,6 +25,9 @@ public final class PatchSettings {
     public Icons.Glyph glyph = Icons.Glyph.PATCH;
     public int color = 0xFF0095F6;
 
+    /** Shown behind the "What is this?" link on the patch's page: what it does, and what it's for. */
+    public String aboutWhat, aboutWhy;
+
     /**
      * @param key      prefix for the stored values, e.g. "liquid_glass"
      * @param included usually the patch's {@code isIncluded()}, which the patch makes return true
@@ -56,6 +59,13 @@ public final class PatchSettings {
     public PatchSettings icon(Icons.Glyph glyph, int color) {
         this.glyph = glyph;
         this.color = color;
+        return this;
+    }
+
+    /** Sets the explanation behind the "What is this?" link on the patch's page. */
+    public PatchSettings about(String what, String why) {
+        this.aboutWhat = what;
+        this.aboutWhy = why;
         return this;
     }
 

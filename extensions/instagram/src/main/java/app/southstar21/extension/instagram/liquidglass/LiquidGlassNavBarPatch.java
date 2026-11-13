@@ -52,7 +52,13 @@ public final class LiquidGlassNavBarPatch {
                     BLUR_RADIUS, REFRACTION),
             new SettingsGroup("Selection", "Edge colors need Android 13+.", GLASSY_PILL, EDGE_COLORS),
             new SettingsGroup("Behavior", EXTEND_CONTENT, SHRINK_ON_SCROLL, HAPTICS))
-            .icon(Icons.Glyph.GLASS, 0xFF5E5CE6);
+            .icon(Icons.Glyph.GLASS, 0xFF5E5CE6)
+            .about("Turns the bottom tab bar into a floating glass pill in the style of iOS 26. What scrolls "
+                    + "behind it is blurred and bent at the edges, the selected tab sits in a glass droplet you "
+                    + "can drag along the bar, and the bar shrinks while you scroll down. Blur needs Android 12 "
+                    + "and refraction Android 13, older phones get a tinted pill.",
+                    "It's a look. It brings the design of Instagram on iPhone to Android, and doesn't change "
+                    + "how anything works.");
 
     /** The patch makes this return true, so the menu only shows patches that were applied. */
     public static boolean isIncluded() {

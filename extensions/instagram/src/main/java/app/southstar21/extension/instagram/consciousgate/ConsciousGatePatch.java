@@ -126,7 +126,16 @@ public final class ConsciousGatePatch {
                             ConsciousGatePatch::triggerGate),
                     new ActionSetting("Reset today", "Clears today's time and extra minutes.",
                             ConsciousGatePatch::resetToday)))
-            .icon(Icons.Glyph.HOURGLASS, 0xFF30B0C7);
+            .icon(Icons.Glyph.HOURGLASS, 0xFF30B0C7)
+            .about("Gives the home feed, Reels, Explore, stories and post feeds one shared daily time budget. "
+                    + "Time only counts while one of them is on screen. In the last 15 seconds they frost over "
+                    + "and can only be scrolled, then a gate closes them until the new day starts and pauses "
+                    + "Reels and stories. Messages, searching for people and profiles keep working the whole "
+                    + "time. The gate can give you a few extra minutes after a short countdown, and quiet hours "
+                    + "or a morning start can keep the screens closed at set times.",
+                    "Endless feeds are made to keep you scrolling long after you meant to stop. The gate lets "
+                    + "you still check in every day, but with an end you chose yourself, and makes taking more "
+                    + "time a decision rather than a reflex.");
 
     /** The patch makes this return true, so the menu only shows patches that were applied. */
     public static boolean isIncluded() {
