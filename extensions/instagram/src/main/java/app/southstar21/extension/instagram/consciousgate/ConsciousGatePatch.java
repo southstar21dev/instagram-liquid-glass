@@ -1,8 +1,10 @@
 package app.southstar21.extension.instagram.consciousgate;
 
 import android.app.Activity;
+import android.app.Application;
 import android.content.Context;
 import android.content.SharedPreferences;
+import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.SystemClock;
@@ -23,6 +25,7 @@ import app.southstar21.extension.instagram.settings.IntSetting;
 import app.southstar21.extension.instagram.settings.PatchSettings;
 import app.southstar21.extension.instagram.settings.SettingsGroup;
 import app.southstar21.extension.instagram.settings.StringSetting;
+import app.southstar21.extension.instagram.settings.TimeSetting;
 
 /**
  * Conscious gate patch: a daily time budget for the home feed, Reels and Explore.
@@ -53,7 +56,12 @@ public final class ConsciousGatePatch {
     static final BooleanSetting GATE_REELS = new BooleanSetting("conscious_gate_reels",
             "Reels", "The Reels tab, and reels opened from anywhere else.", false, true);
     static final BooleanSetting GATE_EXPLORE = new BooleanSetting("conscious_gate_explore",
-            "Explore", "The Explore grid, and posts and reels in search results.", false, true);
+            "Explore", "The Explore grid, search results, hashtags, and posts opened from them.", false, true);
+    static final BooleanSetting GATE_STORIES = new BooleanSetting("conscious_gate_stories",
+            "Stories", "Watching stories, from the home feed or a profile.", false, true);
+    static final BooleanSetting GATE_FEEDS = new BooleanSetting("conscious_gate_feeds",
+            "Post feeds", "Scrolling through a profile's posts, or a place's. The profiles themselves "
+                    + "stay open, and so do your own and your saved posts.", false, true);
 
     static final IntSetting WEEKDAY_MINUTES = new IntSetting("conscious_gate_minutes",
             "Weekday time", "Monday to Friday, shared by the gated screens.", false,
@@ -72,14 +80,14 @@ public final class ConsciousGatePatch {
 
     static final BooleanSetting QUIET_HOURS = new BooleanSetting("conscious_gate_quiet_hours",
             "Quiet hours", "The gated screens stay closed overnight.", false, false);
-    static final IntSetting QUIET_FROM = new IntSetting("conscious_gate_quiet_from",
-            "Quiet from", null, false, 0, 23, ":00", () -> 23);
-    static final IntSetting QUIET_UNTIL = new IntSetting("conscious_gate_quiet_until",
-            "Quiet until", null, false, 0, 23, ":00", () -> 7);
+    static final TimeSetting QUIET_FROM = new TimeSetting("conscious_gate_quiet_from_time",
+            "Quiet from", null, 23, 0).shownWhen(QUIET_HOURS);
+    static final TimeSetting QUIET_UNTIL = new TimeSetting("conscious_gate_quiet_until_time",
+            "Quiet until", null, 7, 0).shownWhen(QUIET_HOURS);
     static final BooleanSetting MORNING_START = new BooleanSetting("conscious_gate_morning_start",
             "Morning start", "The gated screens stay closed each morning until the time below.", false, false);
-    static final IntSetting MORNING_HOUR = new IntSetting("conscious_gate_morning_hour",
-            "Opens at", null, false, 5, 14, ":00", () -> 9);
+    static final TimeSetting MORNING_TIME = new TimeSetting("conscious_gate_morning_time",
+            "Opens at", null, 9, 0).shownWhen(MORNING_START);
 
     static final IntSetting EXTRA_MINUTES = new IntSetting("conscious_gate_extra_minutes",
             "Extra minutes", "How much time the gate's button adds.", false,
@@ -98,16 +106,16 @@ public final class ConsciousGatePatch {
 
     public static final PatchSettings SETTINGS = new PatchSettings("conscious_gate",
             "Conscious gate",
-            "A daily time budget for the home feed, Reels and Explore. Near the end they frost over "
+            "A daily time budget for the home feed, Reels, Explore and stories. Near the end they frost over "
                     + "and can only be scrolled, then a gate closes them until the next day.",
             ConsciousGatePatch::isIncluded,
             new SettingsGroup("Gated screens",
                     "Searching for people, messages and profiles always work.",
-                    GATE_HOME, GATE_REELS, GATE_EXPLORE),
+                    GATE_HOME, GATE_REELS, GATE_EXPLORE, GATE_STORIES, GATE_FEEDS),
             new SettingsGroup("Budget",
                     "Counts the time a gated screen is on screen. Closed screens don't use time.",
                     WEEKDAY_MINUTES, WEEKEND_MINUTES, FROST_MINUTES, DAY_START),
-            new SettingsGroup("Schedule", QUIET_HOURS, QUIET_FROM, QUIET_UNTIL, MORNING_START, MORNING_HOUR),
+            new SettingsGroup("Schedule", QUIET_HOURS, QUIET_FROM, QUIET_UNTIL, MORNING_START, MORNING_TIME),
             new SettingsGroup("Extra time", EXTRA_MINUTES, EXTRA_TIMES, EXTRA_WAIT),
             new SettingsGroup("Gate", MESSAGE),
             // Temporary, for trying the gate out without waiting for the budget.
@@ -244,27 +252,29 @@ public final class ConsciousGatePatch {
     }
 
     static Reason reason() {
-        int hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY);
-        if (QUIET_HOURS.get() && inHours(hour, QUIET_FROM.get(), QUIET_UNTIL.get())) return Reason.QUIET_HOURS;
-        if (MORNING_START.get() && inHours(hour, DAY_START.get(), MORNING_HOUR.get())) return Reason.MORNING;
+        Calendar now = Calendar.getInstance();
+        int minute = now.get(Calendar.HOUR_OF_DAY) * 60 + now.get(Calendar.MINUTE);
+        if (QUIET_HOURS.get() && inRange(minute, QUIET_FROM.get(), QUIET_UNTIL.get())) return Reason.QUIET_HOURS;
+        if (MORNING_START.get() && inRange(minute, DAY_START.get() * 60, MORNING_TIME.get())) return Reason.MORNING;
         return usedMs >= budgetMs() ? Reason.BUDGET : Reason.OPEN;
     }
 
-    /** Whether {@code hour} is in [from, until), which may wrap past midnight. */
-    private static boolean inHours(int hour, int from, int until) {
+    /** Whether {@code minute} of the day is in [from, until), which may wrap past midnight. */
+    private static boolean inRange(int minute, int from, int until) {
         if (from == until) return false;
-        return from < until ? hour >= from && hour < until : hour >= from || hour < until;
+        return from < until ? minute >= from && minute < until : minute >= from || minute < until;
     }
 
-    /** The hour the gated screens open again, for the gate's text. */
+    /** When the gated screens open again, in minutes of the day, for the gate's text. */
     static int reopensAt(Reason reason) {
         switch (reason) {
             case QUIET_HOURS:
                 return QUIET_UNTIL.get();
             case MORNING:
-                return MORNING_HOUR.get();
+                return MORNING_TIME.get();
             default:
-                return MORNING_START.get() ? Math.max(DAY_START.get(), MORNING_HOUR.get()) : DAY_START.get();
+                int dayStart = DAY_START.get() * 60;
+                return MORNING_START.get() ? Math.max(dayStart, MORNING_TIME.get()) : dayStart;
         }
     }
 
@@ -285,8 +295,8 @@ public final class ConsciousGatePatch {
         return reason() == Reason.BUDGET && extraCount < EXTRA_TIMES.get();
     }
 
-    /** The gate's title: the user's own message, or one for the reason. */
-    static String title(Reason reason) {
+    /** The gate's title: the user's own message, or one for the reason and the screen. */
+    static String title(Reason reason, GatedScreens.Kind kind) {
         String message = MESSAGE.get();
         if (!TextUtils.isEmpty(message)) return message;
         switch (reason) {
@@ -295,19 +305,31 @@ public final class ConsciousGatePatch {
             case MORNING:
                 return "Not yet";
             default:
-                return "That's the feed for today";
+                if (kind == null) return "That's it for today";
+                switch (kind) {
+                    case HOME:
+                        return "That's the feed for today";
+                    case REELS:
+                        return "That's Reels for today";
+                    case EXPLORE:
+                        return "That's Explore for today";
+                    case STORIES:
+                        return "That's stories for today";
+                    default:
+                        return "That's it for today";
+                }
         }
     }
 
     static String body(Reason reason) {
-        String opens = reopensAt(reason) + ":00";
+        String opens = TimeSetting.format(reopensAt(reason));
         String first;
         switch (reason) {
             case QUIET_HOURS:
-                first = "The feed, Reels and Explore open again at " + opens + ".";
+                first = "Feeds, Reels, stories and Explore open again at " + opens + ".";
                 break;
             case MORNING:
-                first = "The feed, Reels and Explore open at " + opens + ".";
+                first = "Feeds, Reels, stories and Explore open at " + opens + ".";
                 break;
             default:
                 first = "You've had your " + budgetMinutes() + " minutes. They open again at " + opens + ".";
@@ -329,7 +351,7 @@ public final class ConsciousGatePatch {
             case QUIET_HOURS:
                 return active + " · quiet hours";
             case MORNING:
-                return active + " · opens at " + MORNING_HOUR.get() + ":00";
+                return active + " · opens at " + TimeSetting.format(MORNING_TIME.get());
             default:
                 return active;
         }
@@ -396,20 +418,80 @@ public final class ConsciousGatePatch {
         return activity == null ? null : screensByActivity.get(activity);
     }
 
+    private static boolean watchingActivities;
+
     /** Called by {@link InstagramHooks} when this patch is switched on. */
     public static void onMainActivityFocusChanged(Activity activity) {
         try {
             loadState(activity);
-            activityRef = new WeakReference<>(activity);
-            if (!screensByActivity.containsKey(activity)) {
-                screensByActivity.put(activity, new GatedScreens(activity));
-            }
-            handler.removeCallbacks(tick);
-            lastTick = SystemClock.uptimeMillis();
-            tick();
+            watchActivities(activity);
+            follow(activity);
         } catch (Throwable t) {
             Log.e(TAG, "Failed to start", t);
         }
+    }
+
+    /**
+     * Some gated screens open in an activity of their own, such as stories opened from a
+     * profile, which open in a transparent modal activity. So the gate follows whichever of
+     * Instagram's activities is in front.
+     */
+    private static void watchActivities(Activity activity) {
+        if (watchingActivities) return;
+        watchingActivities = true;
+        activity.getApplication().registerActivityLifecycleCallbacks(new Application.ActivityLifecycleCallbacks() {
+            @Override
+            public void onActivityResumed(Activity resumed) {
+                try {
+                    follow(resumed);
+                } catch (Throwable t) {
+                    Log.e(TAG, "Failed to follow activity", t);
+                }
+            }
+
+            @Override
+            public void onActivityCreated(Activity a, Bundle state) {
+            }
+
+            @Override
+            public void onActivityStarted(Activity a) {
+            }
+
+            @Override
+            public void onActivityPaused(Activity a) {
+            }
+
+            @Override
+            public void onActivityStopped(Activity a) {
+            }
+
+            @Override
+            public void onActivitySaveInstanceState(Activity a, Bundle state) {
+            }
+
+            @Override
+            public void onActivityDestroyed(Activity a) {
+            }
+        });
+    }
+
+    /** Makes {@code activity} the one the ticker watches, and ticks right away. */
+    private static void follow(Activity activity) {
+        activityRef = new WeakReference<>(activity);
+        if (!screensByActivity.containsKey(activity)) {
+            screensByActivity.put(activity, new GatedScreens(activity));
+            // Other activities have no focus hook, so restart the ticker when they get focus.
+            activity.getWindow().getDecorView().getViewTreeObserver().addOnWindowFocusChangeListener(focused -> {
+                if (focused && activityRef.get() == activity) restartTicker();
+            });
+        }
+        restartTicker();
+    }
+
+    private static void restartTicker() {
+        handler.removeCallbacks(tick);
+        lastTick = SystemClock.uptimeMillis();
+        tick();
     }
 
     private static void tick() {

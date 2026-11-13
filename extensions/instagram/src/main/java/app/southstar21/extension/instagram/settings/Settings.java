@@ -18,6 +18,7 @@ import app.southstar21.extension.instagram.reels.DisableReelsPatch;
 public final class Settings {
     private static final String PREFERENCES = "southstar21_patches";
     private static SharedPreferences preferences;
+    private static Context appContext;
 
     private Settings() {
     }
@@ -48,7 +49,8 @@ public final class Settings {
 
     public static void init(Context context) {
         if (preferences == null) {
-            preferences = context.getApplicationContext().getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE);
+            appContext = context.getApplicationContext();
+            preferences = appContext.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE);
         }
     }
 
@@ -61,6 +63,12 @@ public final class Settings {
      * Some hooks run before the main activity has focus (e.g. while Instagram builds its tab
      * list), so this loads the preferences from the application if init() hasn't run yet.
      */
+    /** The application, for formatting that follows the phone's settings, or null. */
+    static Context contextOrNull() {
+        preferencesOrNull();
+        return appContext;
+    }
+
     static SharedPreferences preferencesOrNull() {
         if (preferences == null) {
             try {

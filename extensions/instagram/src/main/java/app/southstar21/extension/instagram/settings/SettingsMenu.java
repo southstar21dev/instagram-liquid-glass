@@ -4,6 +4,7 @@ import android.app.Activity;
 import android.app.AlarmManager;
 import android.app.AlertDialog;
 import android.app.Dialog;
+import android.app.TimePickerDialog;
 import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
@@ -16,6 +17,7 @@ import android.graphics.drawable.GradientDrawable;
 import android.graphics.drawable.RippleDrawable;
 import android.os.SystemClock;
 import android.text.InputFilter;
+import android.text.format.DateFormat;
 import android.text.TextUtils;
 import android.util.TypedValue;
 import android.view.Gravity;
@@ -306,17 +308,29 @@ public final class SettingsMenu {
             View headerView = sectionHeader(group.title);
             list.addView(headerView);
             LinearLayout groupCard = cardView();
-            for (int i = 0; i < group.settings.size(); i++) {
-                Setting setting = group.settings.get(i);
+            List<Setting> shown = new ArrayList<>();
+            for (Setting setting : group.settings) {
+                if (setting.shownWhen == null || setting.shownWhen.get()) shown.add(setting);
+            }
+            for (int i = 0; i < shown.size(); i++) {
+                Setting setting = shown.get(i);
                 if (i > 0) groupCard.addView(dividerView(false));
-                if (setting instanceof StringSetting) {
+                if (setting instanceof TimeSetting) {
+                    groupCard.addView(timeRow((TimeSetting) setting));
+                } else if (setting instanceof StringSetting) {
                     groupCard.addView(textRow((StringSetting) setting));
                 } else if (setting instanceof ActionSetting) {
                     groupCard.addView(buttonRow((ActionSetting) setting));
                 } else if (setting instanceof IntSetting) {
                     groupCard.addView(sliderRow((IntSetting) setting));
                 } else {
-                    groupCard.addView(switchRow((BooleanSetting) setting, setting.title, setting.summary, null));
+                    // Switching a setting that others depend on shows or hides them.
+                    boolean hasDependents = false;
+                    for (Setting other : patch.settings) {
+                        if (other.shownWhen == setting) hasDependents = true;
+                    }
+                    groupCard.addView(switchRow((BooleanSetting) setting, setting.title, setting.summary,
+                            hasDependents ? checked -> replaceTop() : null));
                 }
             }
             list.addView(groupCard);
@@ -448,6 +462,31 @@ public final class SettingsMenu {
         row.addView(label, lp);
         row.setBackground(ripple());
         row.setOnClickListener(v -> onClick.run());
+        return row;
+    }
+
+    private View timeRow(TimeSetting setting) {
+        LinearLayout row = rowContainer(dp(52));
+        row.addView(labels(setting.title, setting.summary, false),
+                new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        TextView value = text(TimeSetting.format(setting.get()), 14, ACCENT, true);
+        value.setPadding(dp(10), dp(4), dp(10), dp(4));
+        GradientDrawable chip = new GradientDrawable();
+        chip.setColor((ACCENT & 0x00FFFFFF) | (dark ? 0x33000000 : 0x1F000000));
+        chip.setCornerRadius(dp(12));
+        value.setBackground(chip);
+        row.addView(value);
+        row.setBackground(ripple());
+        row.setOnClickListener(v -> {
+            int minutes = setting.get();
+            new TimePickerDialog(activity, dark
+                    ? android.R.style.Theme_DeviceDefault_Dialog_Alert
+                    : android.R.style.Theme_DeviceDefault_Light_Dialog_Alert,
+                    (picker, hour, minute) -> {
+                        setting.set(hour * 60 + minute);
+                        replaceTop();
+                    }, minutes / 60, minutes % 60, DateFormat.is24HourFormat(activity)).show();
+        });
         return row;
     }
 

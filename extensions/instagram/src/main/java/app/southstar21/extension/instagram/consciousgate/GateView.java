@@ -18,7 +18,7 @@ import java.lang.ref.WeakReference;
 import app.southstar21.extension.instagram.settings.Icons;
 
 /**
- * Covers a gated screen's list from the moment it starts to frost.
+ * Covers a gated screen from the moment it starts to frost.
  * <ul>
  *   <li>While frosting, taps are blocked so nothing can be opened or interacted with, but drags
  *       are passed straight to the list's own scrolling, so it still scrolls. A badge says the
@@ -42,6 +42,7 @@ final class GateView extends FrameLayout {
     private final int[] ownLocation = new int[2];
     private final int[] listLocation = new int[2];
     private WeakReference<View> list = new WeakReference<>(null);
+    private boolean scrollable;
     private boolean shown;
     private boolean closed;
     private boolean extraAvailable;
@@ -136,9 +137,13 @@ final class GateView extends FrameLayout {
         addView(card, new LayoutParams(dp(300), LayoutParams.WRAP_CONTENT, Gravity.CENTER));
     }
 
-    /** The list under the gate, which drags are passed to while the gate is open. */
-    void setList(View list) {
-        if (this.list.get() != list) this.list = new WeakReference<>(list);
+    /**
+     * The surface under the gate. While the gate is open, drags are passed to it if it's a list;
+     * other surfaces, such as stories, get no touches at all.
+     */
+    void setSurface(View surface, boolean scrollable) {
+        if (this.list.get() != surface) this.list = new WeakReference<>(surface);
+        this.scrollable = scrollable;
     }
 
     void setBadge(String text) {
@@ -212,7 +217,7 @@ final class GateView extends FrameLayout {
         // Open: hand the gesture to the RecyclerView's own touch handling, which scrolls it
         // but never reaches its items, so nothing can be tapped, liked or opened.
         View target = list.get();
-        if (target != null && target.isAttachedToWindow()) {
+        if (scrollable && target != null && target.isAttachedToWindow()) {
             getLocationOnScreen(ownLocation);
             target.getLocationOnScreen(listLocation);
             MotionEvent copy = MotionEvent.obtain(event);
