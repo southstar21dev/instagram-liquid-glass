@@ -1,3 +1,14 @@
+## [1.2.0-dev.2](https://github.com/southstar21dev/southstar21-patches/compare/v1.2.0-dev.1...v1.2.0-dev.2) (2026-11-13)
+
+### 🐛 Bug Fixes
+
+* **Conscious gate:** Add the missing space in the description ([a7e1ef3](https://github.com/southstar21dev/southstar21-patches/commit/a7e1ef34bb64a5d595a466dd55de21aeebc69711))
+* **Disable Reels:** Patch with Morphe Manager 2.5.0 ([e7cb329](https://github.com/southstar21dev/southstar21-patches/commit/e7cb329169059562619b98c81acd644404393b8a))
+
+### ✨ New Features
+
+* **Settings:** What is this? page for each patch ([b4f4e07](https://github.com/southstar21dev/southstar21-patches/commit/b4f4e07cf5a53a1e46bfdbbfc760e4be89c3c583))
+
 ## [1.2.0-dev.1](https://github.com/southstar21dev/southstar21-patches/compare/v1.1.0...v1.2.0-dev.1) (2026-11-13)
 
 ### ✨ New Features

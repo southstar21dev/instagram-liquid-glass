@@ -44,7 +44,7 @@ Patched apps are signed with a different key, so uninstall the Play Store versio
 ## Patches
 
 <!-- PATCHES_START EXPANDED -->
-> **[v1.2.0-dev.1](https://github.com/southstar21dev/southstar21-patches/releases/tag/v1.2.0-dev.1)**&nbsp;&nbsp;•&nbsp;&nbsp;`dev`&nbsp;&nbsp;•&nbsp;&nbsp;8 patches total
+> **[v1.2.0-dev.2](https://github.com/southstar21dev/southstar21-patches/releases/tag/v1.2.0-dev.2)**&nbsp;&nbsp;•&nbsp;&nbsp;`dev`&nbsp;&nbsp;•&nbsp;&nbsp;8 patches total
 <details open>
 <summary>📦 Instagram&nbsp;&nbsp;•&nbsp;&nbsp;8 patches</summary>
 <br>
@@ -57,7 +57,7 @@ Patched apps are signed with a different key, so uninstall the Play Store versio
 | 💊&nbsp;Patch | 📜&nbsp;Description | ⚙️&nbsp;Options |
 |----------|----------------|-----------|
 | [Bypass signature check](#bypass-signature-check) | Stops Instagram rejecting apps by their signature, which a patched app no longer matches. |  |
-| [Conscious gate](#conscious-gate) | Gives the home feed, Reels and Explore a daily time budget. In the last 15 seconds they frost over and can only be scrolled,then a gate closes them until the next day. Searching for people, messages and profiles keep working. |  |
+| [Conscious gate](#conscious-gate) | Gives the home feed, Reels and Explore a daily time budget. In the last 15 seconds they frost over and can only be scrolled, then a gate closes them until the next day. Searching for people, messages and profiles keep working. |  |
 | [Disable Reels](#disable-reels) | Removes reels from the home feed and Explore, and stops scrolling from one reel to the next. Each part is off until you switch it on in the settings. |  |
 | [Hide ads](#hide-ads) | Removes sponsored posts, stories and reels, and ad units in the home feed. Each part can be switched off in the settings. |  |
 | [Hide navigation buttons](#hide-navigation-buttons) | Adds settings to hide Search, Reels, Create, Messages and other tabs from the bottom bar. |  |
