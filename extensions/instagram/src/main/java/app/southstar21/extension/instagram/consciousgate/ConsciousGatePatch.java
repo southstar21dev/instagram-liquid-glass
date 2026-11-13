@@ -31,7 +31,7 @@ import app.southstar21.extension.instagram.settings.TimeSetting;
  * Conscious gate patch: a daily time budget for the home feed, Reels and Explore.
  * <p>
  * Time counts while one of the gated screens is on screen and Instagram has focus. During the
- * last minutes of the budget the screens slowly frost over and can only be scrolled, and once
+ * last 15 seconds of the budget the screens frost over and can only be scrolled, and once
  * it's used up a gate closes them until the next day. Quiet hours and a morning start can keep
  * them closed at set times. Searching for people, messages and profiles always work.
  * <p>
@@ -48,6 +48,8 @@ public final class ConsciousGatePatch {
     private static final long MAX_TICK_GAP_MS = 2000;
     private static final long SAVE_EVERY_MS = 5000;
     private static final long MINUTE_MS = 60_000;
+    /** The last part of the budget, as the screens frost over and can only be scrolled. */
+    private static final long FROST_MS = 15_000;
 
     // region Settings
 
@@ -69,10 +71,6 @@ public final class ConsciousGatePatch {
     static final IntSetting WEEKEND_MINUTES = new IntSetting("conscious_gate_weekend_minutes",
             "Weekend time", "Saturday and Sunday.", false,
             5, 180, "min", () -> 30);
-    static final IntSetting FROST_MINUTES = new IntSetting("conscious_gate_frost_minutes",
-            "Frost builds over", "The last minutes of the budget, as the screens slowly frost over. "
-                    + "While frosted, they can be scrolled but nothing can be tapped.", false,
-            1, 15, "min", () -> 5);
     static final IntSetting DAY_START = new IntSetting("conscious_gate_day_start",
             "New day starts at", "When the budget starts again. Scrolling after midnight still "
                     + "counts towards the night before.", false,
@@ -114,14 +112,14 @@ public final class ConsciousGatePatch {
                     GATE_HOME, GATE_REELS, GATE_EXPLORE, GATE_STORIES, GATE_FEEDS),
             new SettingsGroup("Budget",
                     "Counts the time a gated screen is on screen. Closed screens don't use time.",
-                    WEEKDAY_MINUTES, WEEKEND_MINUTES, FROST_MINUTES, DAY_START),
+                    WEEKDAY_MINUTES, WEEKEND_MINUTES, DAY_START),
             new SettingsGroup("Schedule", QUIET_HOURS, QUIET_FROM, QUIET_UNTIL, MORNING_START, MORNING_TIME),
             new SettingsGroup("Extra time", EXTRA_MINUTES, EXTRA_TIMES, EXTRA_WAIT),
             new SettingsGroup("Gate", MESSAGE),
             // Temporary, for trying the gate out without waiting for the budget.
             new SettingsGroup("Testing", "Manual triggers for trying the gate out. They change today's time only.",
                     new ActionSetting("Start the frost now",
-                            "Skips to the start of the frost, which then builds over the minutes set above.",
+                            "Skips to the last 15 seconds, as the frost builds.",
                             ConsciousGatePatch::triggerFrost),
                     new ActionSetting("Freeze now",
                             "Fully frosts the screens and closes the gate right away, without the gradual blur.",
@@ -231,7 +229,7 @@ public final class ConsciousGatePatch {
     }
 
     private static long frostStartMs() {
-        long frostMs = FROST_MINUTES.get() * MINUTE_MS;
+        long frostMs = FROST_MS;
         long start = budgetMs() - frostMs;
         if (extraCount > 0) {
             // After extra time is taken, its first part is always clear, since the
@@ -280,7 +278,7 @@ public final class ConsciousGatePatch {
 
     /**
      * How frosted the screens are, from 0 (clear) to 1 (fully frosted). The frost builds over
-     * the last minutes of the budget, and is full whenever the gate is closed.
+     * the last 15 seconds of the budget, and is full whenever the gate is closed.
      */
     static float frostLevel() {
         if (reason() != Reason.OPEN) return 1f;
@@ -340,18 +338,18 @@ public final class ConsciousGatePatch {
 
     /** The text of the badge on the gated screens. */
     static String badge(Reason reason) {
-        String active = "Conscious gate is active";
+        String active = "Conscious gate active";
         switch (reason) {
             case OPEN: {
                 long left = remainingMs();
-                if (left < MINUTE_MS) return active + " · under a minute left";
+                if (left < MINUTE_MS) return active + ": under a minute left";
                 long minutes = (left + MINUTE_MS - 1) / MINUTE_MS;
-                return active + " · " + minutes + " min left";
+                return active + ": " + minutes + " min left";
             }
             case QUIET_HOURS:
-                return active + " · quiet hours";
+                return active + ": quiet hours";
             case MORNING:
-                return active + " · opens at " + TimeSetting.format(MORNING_TIME.get());
+                return active + ": opens at " + TimeSetting.format(MORNING_TIME.get());
             default:
                 return active;
         }
