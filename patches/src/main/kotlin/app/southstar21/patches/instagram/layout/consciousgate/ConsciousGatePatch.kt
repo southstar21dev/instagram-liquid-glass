@@ -11,7 +11,7 @@ private const val EXTENSION_CLASS =
 @Suppress("unused")
 val consciousGatePatch = bytecodePatch(
     name = "Conscious gate",
-    description = "Gives the home feed, Reels and Explore a daily time budget. In the last 15 seconds they frost over and can only be scrolled," +
+    description = "Gives the home feed, Reels and Explore a daily time budget. In the last 15 seconds they frost over and can only be scrolled, " +
             "then a gate closes them until the next day. Searching for people, messages and profiles keep working.",
     default = true
 ) {
