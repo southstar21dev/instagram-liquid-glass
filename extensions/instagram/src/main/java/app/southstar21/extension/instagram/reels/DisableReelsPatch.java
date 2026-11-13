@@ -120,7 +120,13 @@ public final class DisableReelsPatch {
                 if (reelType.equals(name)) return true;
             }
         }
-        return isReel(feedItemMedia(item));
+        Object media = null;
+        try {
+            media = feedItemMedia(item);
+        } catch (Throwable ignored) {
+            // Some builds' getter throws if the item has no content yet.
+        }
+        return isReel(media);
     }
 
     // endregion

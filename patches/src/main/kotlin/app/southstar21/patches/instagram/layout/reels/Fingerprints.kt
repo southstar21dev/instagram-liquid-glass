@@ -32,26 +32,34 @@ internal object FeedItemTypeFingerprint : Fingerprint(
 )
 
 /**
- * FeedItem's null-safe getter for its media, the one that unwraps the content holder:
- * `public final ()Media`, which gets the media through a static call.
+ * FeedItem's getter for its media, the one that unwraps the content holder: its only
+ * `public final ()Media` method.
  *
- * Looked up in FeedItem's methods directly rather than with a class fingerprint. Hide ads and
- * this patch change FeedItem, and Morphe Patcher 2.3.0 doesn't match a class fingerprint's
- * method in a class that was already changed.
+ * Builds of the same version differ inside it: 386014705 unwraps the content through a static
+ * call, 386014775 has that call inlined to an interface call. So only the signature is relied
+ * on, and the body only breaks a tie, by calling something else that returns Media.
  */
 internal fun feedItemMediaGetter(): Method {
-    val getters = FeedItemTypeFingerprint.originalClassDef.methods.filter { method ->
+    val methods = FeedItemTypeFingerprint.originalClassDef.methods
+    val getters = methods.filter { method ->
         method.accessFlags == (AccessFlags.PUBLIC.value or AccessFlags.FINAL.value) &&
                 method.returnType == MEDIA_CLASS &&
-                method.parameterTypes.isEmpty() &&
-                method.implementation?.instructions?.any { instruction ->
-                    instruction.opcode == Opcode.INVOKE_STATIC &&
-                            ((instruction as? ReferenceInstruction)?.reference as? MethodReference)
-                                ?.returnType == MEDIA_CLASS
-                } == true
+                method.parameterTypes.isEmpty()
     }
-    return getters.singleOrNull()
-        ?: throw PatchException("Expected one media getter in FeedItem, found ${getters.size}")
+    getters.singleOrNull()?.let { return it }
+
+    val unwrapping = getters.filter { method ->
+        method.implementation?.instructions?.any { instruction ->
+            ((instruction as? ReferenceInstruction)?.reference as? MethodReference)
+                ?.returnType == MEDIA_CLASS
+        } == true
+    }
+    return unwrapping.singleOrNull() ?: throw PatchException(
+        "Expected one media getter in FeedItem, found ${getters.size}: " +
+                getters.joinToString { it.name } +
+                ". Methods returning Media: " +
+                methods.filter { it.returnType == MEDIA_CLASS }.joinToString { "${it.name}${it.parameterTypes}" }
+    )
 }
 
 /** Parses one FeedItem from JSON. Every feed, and the feed cache, goes through it. */
