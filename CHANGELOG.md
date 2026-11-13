@@ -1,3 +1,12 @@
+## [1.2.0-dev.1](https://github.com/southstar21dev/southstar21-patches/compare/v1.1.0...v1.2.0-dev.1) (2026-11-13)
+
+### ✨ New Features
+
+* Conscious gate patch ([6945055](https://github.com/southstar21dev/southstar21-patches/commit/69450557e133922bb126adc09507f12d04ac30b3))
+* **Conscious gate:** Frost only the last 15 seconds ([1b39d0a](https://github.com/southstar21dev/southstar21-patches/commit/1b39d0ad93ac59fc2c242b8b60022c6d2b68b32c))
+* **Conscious gate:** Gate stories and post feeds, pause Reels in place ([b56a293](https://github.com/southstar21dev/southstar21-patches/commit/b56a29321a2e0d9bdbf20826fdda978906063356))
+* Support Instagram 454.0.0.54.77 ([b119065](https://github.com/southstar21dev/southstar21-patches/commit/b119065289776c68d1824dd205fa5b8613d940e3))
+
 ## [1.1.0](https://github.com/southstar21dev/southstar21-patches/compare/v1.0.0...v1.1.0) (2026-11-04)
 
 ### ✨ New Features
