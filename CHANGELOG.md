@@ -1,3 +1,9 @@
+## [1.2.0-dev.4](https://github.com/southstar21dev/southstar21-patches/compare/v1.2.0-dev.3...v1.2.0-dev.4) (2026-11-13)
+
+### ✨ New Features
+
+* **Hide navigation buttons:** Included by default ([480a7d6](https://github.com/southstar21dev/southstar21-patches/commit/480a7d627372bc7974040619181b6ba145842e0a))
+
 ## [1.2.0-dev.3](https://github.com/southstar21dev/southstar21-patches/compare/v1.2.0-dev.2...v1.2.0-dev.3) (2026-11-13)
 
 ### 🐛 Bug Fixes
