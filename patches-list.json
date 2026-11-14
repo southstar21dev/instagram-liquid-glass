@@ -1,6 +1,6 @@
 {
   "NOTE": "Do NOT manually edit this file. This file is automatically updated when semantic release (release.yml) runs. Manually editing this file can break your releases and break third party tools that use this file.",
-  "version": "1.2.0-dev.4",
+  "version": "1.2.0-dev.5",
   "patches": [
     {
       "name": "Bypass signature check",
@@ -211,11 +211,11 @@
           "description": "Blur applied to content behind the bar, in dp.",
           "required": true,
           "type": "kotlin.Int",
-          "default": 12,
+          "default": 4,
           "values": {
-            "Clear": 6,
-            "Default": 12,
-            "Frosted": 20
+            "Clear": 2,
+            "Default": 4,
+            "Frosted": 12
           }
         },
         {

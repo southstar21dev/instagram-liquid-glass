@@ -1,3 +1,9 @@
+## [1.2.0-dev.5](https://github.com/southstar21dev/southstar21-patches/compare/v1.2.0-dev.4...v1.2.0-dev.5) (2026-11-14)
+
+### ✨ New Features
+
+* **Liquid Glass navigation bar:** Customize navbar page and iOS look ([a1c3e1d](https://github.com/southstar21dev/southstar21-patches/commit/a1c3e1d7e0576ac603e088b5fdfa697010533186))
+
 ## [1.2.0-dev.4](https://github.com/southstar21dev/southstar21-patches/compare/v1.2.0-dev.3...v1.2.0-dev.4) (2026-11-13)
 
 ### ✨ New Features
