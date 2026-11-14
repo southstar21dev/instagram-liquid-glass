@@ -1,6 +1,6 @@
 {
   "NOTE": "Do NOT manually edit this file. This file is automatically updated when semantic release (release.yml) runs. Manually editing this file can break your releases and break third party tools that use this file.",
-  "version": "1.2.0-dev.7",
+  "version": "1.2.0-dev.8",
   "patches": [
     {
       "name": "Bypass signature check",
@@ -38,8 +38,8 @@
     },
     {
       "name": "Conscious gate",
-      "description": "Gives the home feed, Reels and Explore a daily time budget. In the last 15 seconds they frost over and can only be scrolled, then a gate closes them until the next day. Searching for people, messages and profiles keep working.",
-      "default": true,
+      "description": "Gives the home feed, Reels, Explore and stories a daily time budget. In the last 15 seconds they frost over and can only be scrolled, then a gate closes them until the next day. Searching for people, messages and profiles keep working. Off until you switch it on in the settings.",
+      "default": false,
       "category": null,
       "compatiblePackages": [
         {

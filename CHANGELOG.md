@@ -1,3 +1,13 @@
+## [1.2.0-dev.8](https://github.com/southstar21dev/southstar21-patches/compare/v1.2.0-dev.7...v1.2.0-dev.8) (2026-11-14)
+
+### 🐛 Bug Fixes
+
+* **Conscious gate:** Off by default, swipe to Create through the gate and other fixes ([e339fd3](https://github.com/southstar21dev/southstar21-patches/commit/e339fd329b697102ae76dcbd6c61de4dcc725d96))
+
+### ✨ New Features
+
+* **Liquid Glass navigation bar:** Clear glass drop in the southstar21 style ([a6bd82b](https://github.com/southstar21dev/southstar21-patches/commit/a6bd82bead6a59e6da866a9d1a2fa08d17c0c637))
+
 ## [1.2.0-dev.7](https://github.com/southstar21dev/southstar21-patches/compare/v1.2.0-dev.6...v1.2.0-dev.7) (2026-11-14)
 
 ### ✨ New Features
