@@ -1022,7 +1022,7 @@ final class LiquidGlassLens extends View {
         shader.setFloatUniform("dispersion", dispersion);
         shader.setFloatUniform("dark", dark ? 1f : 0f);
         drawThroughShader(canvas, r, dark, shader, Math.round(strength + dispersion + 4 * density),
-                Math.min(1f, p * 1.4f), p, false);
+                Math.min(1f, p * 1.4f));
     }
 
     /**
@@ -1043,14 +1043,13 @@ final class LiquidGlassLens extends View {
                 return;
             }
         }
-        // No magnification of the page; the icons are drawn 1.2x larger instead (dropScene).
+        // As on iOS: no magnification. The drop is clear glass over what's really beneath it,
+        // the page and the bar itself (see drawThroughShader).
         dropShader.setFloatUniform("mag", 1f);
         dropShader.setFloatUniform("band", 10f * density * scale);
-        // The bar copy fades out towards the rim, so the rim is clear (see recordDropScene).
-        dropBand = 10f * density * scale;
-        dropRadius = r;
-        // Positive: the rim bends in what's just outside the drop, so its sides are clear glass
-        // showing what's around it (the page above and below the bar), with rainbow edges.
+        // Positive: the rim bends in what's just outside the drop, so where the drop sticks out
+        // past the bar, the bar's edge curves into its rim with the page beyond it, in rainbow
+        // fringes; over the bar, the bar itself shows through unchanged.
         dropShader.setFloatUniform("amount", amount);
         dropShader.setFloatUniform("chromaticAberration", ca);
         dropShader.setFloatUniform("darken", 0f);
@@ -1058,20 +1057,15 @@ final class LiquidGlassLens extends View {
         dropShader.setFloatUniform("innerAlpha", 0.15f * alpha);
         dropShader.setFloatUniform("highlightWidth", 1.5f * density * scale);
         dropShader.setFloatUniform("highlight", 0.5f * alpha);
-        drawThroughShader(canvas, r, dark, dropShader, Math.round(amount * (1f + ca) + 4 * density), alpha,
-                p, true);
+        drawThroughShader(canvas, r, dark, dropShader, Math.round(amount * (1f + ca) + 4 * density), alpha);
     }
 
     /**
      * Records everything up to and including the tab bar around {@link #lens}, with {@code pad}
      * px to spare for samples outside it, and draws it through {@code effect} clipped to the lens.
      * Sets the {@code center}, {@code halfSize} and {@code radius} uniforms.
-     *
-     * @param dropScene instead of the bar itself, put a smaller copy of it under the lens, as
-     *                  the southstar21 style's drop shows: see {@link #recordDropScene}
      */
-    private void drawThroughShader(Canvas canvas, float r, boolean dark, RuntimeShader effect, int pad, float alpha,
-                                   float p, boolean dropScene) {
+    private void drawThroughShader(Canvas canvas, float r, boolean dark, RuntimeShader effect, int pad, float alpha) {
         if (!(bar.getParent() instanceof ViewGroup)) return;
         ViewGroup parent = (ViewGroup) bar.getParent();
         int barIndex = parent.indexOfChild(bar);
@@ -1091,27 +1085,23 @@ final class LiquidGlassLens extends View {
         float originY = getTop() + getTranslationY() + lens.top - pad;
 
         scene.setPosition(0, 0, w, h);
-        if (dropScene) {
-            recordDropScene(parent, barIndex, dark, w, h, originX, originY, p);
-        } else {
-            RecordingCanvas rc = scene.beginRecording(w, h);
-            try {
-                rc.translate(-originX, -originY);
-                for (int i = 0; i <= barIndex; i++) {
-                    View child = parent.getChildAt(i);
-                    if (child.getVisibility() != VISIBLE || child.getAlpha() == 0f) continue;
-                    int save = rc.save();
-                    rc.translate(child.getLeft() + child.getTranslationX(), child.getTop() + child.getTranslationY());
-                    child.draw(rc);
-                    rc.restoreToCount(save);
-                }
-                // Videos under the bar are holes in the recording: fill them, then the base.
-                SurfaceSnapshots snapshots = glass.snapshots();
-                if (snapshots != null) snapshots.draw(rc);
-                rc.drawColor(dark ? Color.BLACK : Color.WHITE, android.graphics.PorterDuff.Mode.DST_OVER);
-            } finally {
-                scene.endRecording();
+        RecordingCanvas rc = scene.beginRecording(w, h);
+        try {
+            rc.translate(-originX, -originY);
+            for (int i = 0; i <= barIndex; i++) {
+                View child = parent.getChildAt(i);
+                if (child.getVisibility() != VISIBLE || child.getAlpha() == 0f) continue;
+                int save = rc.save();
+                rc.translate(child.getLeft() + child.getTranslationX(), child.getTop() + child.getTranslationY());
+                child.draw(rc);
+                rc.restoreToCount(save);
             }
+            // Videos under the bar are holes in the recording: fill them, then the base.
+            SurfaceSnapshots snapshots = glass.snapshots();
+            if (snapshots != null) snapshots.draw(rc);
+            rc.drawColor(dark ? Color.BLACK : Color.WHITE, android.graphics.PorterDuff.Mode.DST_OVER);
+        } finally {
+            scene.endRecording();
         }
 
         effect.setFloatUniform("center", w / 2f, h / 2f);
@@ -1139,167 +1129,6 @@ final class LiquidGlassLens extends View {
         canvas.translate(lens.left, lens.top);
         canvas.drawRenderNode(clip);
         canvas.restoreToCount(save);
-    }
-
-    /** The drop's rim width and corner radius, for fading the bar copy out towards the rim. */
-    private float dropBand, dropRadius;
-    private RenderNode dropFade, dropCapsuleSoft;
-    private RenderEffect dropFadeBlur;
-    private float dropFadeBlurRadius;
-    private RenderNode dropPage;
-    private RenderNode dropPageBlur;
-    private RenderNode dropCapsule;
-    private RenderEffect dropBlur;
-    private float dropBlurRadius;
-
-    /**
-     * What the southstar21 style's drop looks through (into {@link #scene}, {@code w} by
-     * {@code h} with its origin at {@code originX, originY} in the parent): the page, then a
-     * copy of the bar 4dp to 5dp smaller on each side as the drop opens (the page blurred 8dp under the bar's own tint),
-     * then the tab icons 1.2x larger. Inside the drop the bar looks shrunk,
-     * with the page above and below it.
-     */
-    private void recordDropScene(ViewGroup parent, int barIndex, boolean dark, int w, int h,
-                                 float originX, float originY, float p) {
-        if (dropPage == null) {
-            dropPage = new RenderNode("LiquidGlassDropPage");
-            dropPage.setUseCompositingLayer(true, null);
-            dropPageBlur = new RenderNode("LiquidGlassDropPageBlur");
-            dropCapsule = new RenderNode("LiquidGlassDropCapsule");
-        }
-
-        // The page: everything under the bar.
-        dropPage.setPosition(0, 0, w, h);
-        RecordingCanvas pc = dropPage.beginRecording(w, h);
-        try {
-            pc.translate(-originX, -originY);
-            for (int i = 0; i < barIndex; i++) {
-                View child = parent.getChildAt(i);
-                if (child.getVisibility() != VISIBLE || child.getAlpha() == 0f) continue;
-                int save = pc.save();
-                pc.translate(child.getLeft() + child.getTranslationX(), child.getTop() + child.getTranslationY());
-                child.draw(pc);
-                pc.restoreToCount(save);
-            }
-            // Videos are holes in the recording: fill them, then the base color.
-            SurfaceSnapshots snapshots = glass.snapshots();
-            if (snapshots != null) snapshots.draw(pc);
-            pc.drawColor(dark ? Color.BLACK : Color.WHITE, android.graphics.PorterDuff.Mode.DST_OVER);
-        } finally {
-            dropPage.endRecording();
-        }
-
-        // The same page blurred, for the bar copy's material.
-        float blur = 8f * density;
-        if (dropBlur == null || dropBlurRadius != blur) {
-            dropBlurRadius = blur;
-            dropBlur = RenderEffect.createBlurEffect(blur, blur, Shader.TileMode.CLAMP);
-        }
-        dropPageBlur.setPosition(0, 0, w, h);
-        RecordingCanvas bc = dropPageBlur.beginRecording(w, h);
-        try {
-            bc.drawRenderNode(dropPage);
-        } finally {
-            dropPageBlur.endRecording();
-        }
-        dropPageBlur.setRenderEffect(dropBlur);
-
-        // The bar copy, in the scene's coordinates.
-        // Seen through the drop, the bar looks refracted smaller: 4dp in from the bar's edges
-        // at rest, 5dp once the drop is fully open.
-        float inset = (4f + 1f * Math.max(0f, Math.min(1f, p))) * density;
-        float sx = getLeft() - originX;
-        float sy = getTop() + getTranslationY() - originY;
-        float cl = sx + pill.left + inset, ct = sy + pill.top + inset;
-        float cr = sx + pill.right - inset, cb = sy + pill.bottom - inset;
-        int cw = Math.round(cr - cl), ch = Math.round(cb - ct);
-        boolean capsule = cw > 0 && ch > 0;
-        if (capsule) {
-            dropCapsule.setPosition(Math.round(cl), Math.round(ct), Math.round(cl) + cw, Math.round(ct) + ch);
-            Outline outline = new Outline();
-            outline.setRoundRect(0, 0, cw, ch, ch / 2f * style().roundness);
-            dropCapsule.setOutline(outline);
-            dropCapsule.setClipToOutline(true);
-            RecordingCanvas kc = dropCapsule.beginRecording(cw, ch);
-            try {
-                kc.translate(-Math.round(cl), -Math.round(ct));
-                kc.drawRenderNode(dropPageBlur);
-                // The bar's own tint, so the copy is exactly as light as the real bar.
-                int a = Math.round(255 * Math.max(0f, Math.min(1f, glass.currentTint())));
-                kc.drawColor(glass.materialColor(a));
-            } finally {
-                dropCapsule.endRecording();
-            }
-        }
-
-        RecordingCanvas rc = scene.beginRecording(w, h);
-        try {
-            rc.drawRenderNode(dropPage);
-            if (capsule) rc.drawRenderNode(softCapsule(w, h));
-            // The tab icons, 1.2x larger as the drop swells, each around its own center.
-            float grow = 1f + 0.2f * Math.max(0f, Math.min(1f, p));
-            rc.translate(-originX + bar.getLeft() + bar.getTranslationX(),
-                    -originY + bar.getTop() + bar.getTranslationY());
-            for (int i = 0; i < bar.getChildCount(); i++) {
-                View tab = bar.getChildAt(i);
-                if (tab.getVisibility() != VISIBLE || tab.getAlpha() == 0f) continue;
-                int save = rc.save();
-                rc.translate(tab.getLeft(), tab.getTop());
-                rc.concat(tab.getMatrix());
-                rc.scale(grow, grow, tab.getWidth() / 2f, tab.getHeight() / 2f);
-                tab.draw(rc);
-                rc.restoreToCount(save);
-            }
-        } finally {
-            scene.endRecording();
-        }
-    }
-
-    /**
-     * The bar copy faded out towards the drop's rim: inside the rim it shows, through the rim it
-     * fades softly to nothing, so the rim is clear glass over the page around the drop without
-     * a hard edge where the copy stops. {@code w} by {@code h} is the drop's scene.
-     */
-    private RenderNode softCapsule(int w, int h) {
-        if (dropFade == null) {
-            dropFade = new RenderNode("LiquidGlassDropFade");
-            Paint keep = new Paint();
-            keep.setXfermode(new android.graphics.PorterDuffXfermode(android.graphics.PorterDuff.Mode.DST_IN));
-            dropFade.setUseCompositingLayer(true, keep);
-            dropCapsuleSoft = new RenderNode("LiquidGlassDropCapsuleSoft");
-            dropCapsuleSoft.setUseCompositingLayer(true, null);
-        }
-        float padX = (w - lens.width()) / 2f, padY = (h - lens.height()) / 2f;
-        float b = Math.max(1f, Math.min(dropBand, Math.min(lens.width(), lens.height()) / 2f - 1f));
-        float ir = Math.max(0f, dropRadius - b * 0.6f);
-
-        // The mask: the drop a little inside its rim, blurred across the rim.
-        float blur = b * 0.6f;
-        if (dropFadeBlur == null || dropFadeBlurRadius != blur) {
-            dropFadeBlurRadius = blur;
-            dropFadeBlur = RenderEffect.createBlurEffect(blur, blur, Shader.TileMode.DECAL);
-        }
-        dropFade.setPosition(0, 0, w, h);
-        RecordingCanvas mc = dropFade.beginRecording(w, h);
-        try {
-            fill.setColor(Color.WHITE);
-            float inset = b * 0.6f;
-            mc.drawRoundRect(padX + inset, padY + inset, padX + lens.width() - inset, padY + lens.height() - inset,
-                    ir, ir, fill);
-        } finally {
-            dropFade.endRecording();
-        }
-        dropFade.setRenderEffect(dropFadeBlur);
-
-        dropCapsuleSoft.setPosition(0, 0, w, h);
-        RecordingCanvas sc = dropCapsuleSoft.beginRecording(w, h);
-        try {
-            sc.drawRenderNode(dropCapsule);
-            sc.drawRenderNode(dropFade);
-        } finally {
-            dropCapsuleSoft.endRecording();
-        }
-        return dropCapsuleSoft;
     }
 
     private static float lerp(float a, float b, float t) {
