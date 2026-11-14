@@ -75,15 +75,22 @@ Instagram's iOS 26 Liquid Glass design on Android, matched against screen record
 
 - **Floating glass tab bar.** A frosted pill with live background blur, a subtle refracting rim and a grey capsule behind the selected tab.
 - **Shrinks while scrolling.** Scrolling down scales the whole bar down (every tab stays visible and tappable), scrolling up brings it back.
-- **Gliding selection.** Drag along the bar to slide the selection between tabs as clear glass, with a haptic tick per tab; let go to open the tab underneath.
+- **Gliding selection.** Drag along the bar to slide the grey selection capsule between tabs, as on iOS, with a haptic tick per tab; let go to open the tab underneath. Switch on *Glass while dragging* to turn the capsule into clear glass while it moves.
 - **Adaptive tint.** The glass frosts more when what's behind it would make the icons hard to read, and turns dark on Reels and in dark mode.
+- **southstar21 style.** An optional switch in the settings menu (off by default) gives the bar thicker glass that bends what's behind it towards the edges. A press swells the selection into a magnifying drop of glass that wobbles, stretches as you drag it and ticks over each tab. The bar shrinks back behind the drop, leans and glows under your finger.
+- **Customize navbar.** A page in the settings menu with a live preview of the bar pinned at the top: tap and drag along it, scroll the sample feed under it, and it changes as you move each slider.
+  - **Under the preview:** light or dark, three backdrops (photos, text, colors), pause, hold to compare with the default look, and one-tap presets (iOS, Clear, Frosted, Bold, Minimal, Neon).
+  - **A "?" on every setting** opens a short demo: the bar sweeps that one setting from low to high on its own, acting out a drag, taps or scrolling where that's what shows it. The demos are drawn live, so they add no files.
+  - **Glass:** blur, refraction, opacity, vibrancy, clear edge, rim, end glare, shadow and a tint color.
+  - **Shape:** height, side margin, bottom gap, roundness and tab inset.
+  - **Selection:** shade, width, inset, 3D pill, edge colors and drop size.
 - Taps, double taps and long presses on the tabs still go to Instagram untouched.
 
 Android 13+ gets the full effect, Android 12 gets blur without refraction, and older versions get a translucent tinted pill.
 
 | Option | Default | |
 |---|---|---|
-| Blur radius | 12 dp | How frosted the glass is (0 to 40). |
+| Blur radius | 4 dp | How frosted the glass is (0 to 40). iOS Instagram barely blurs. |
 | Refraction strength | 60 | How strongly the edge bends what's behind it (0 to 100). |
 | Extend content behind bar | on | Lets feeds scroll under the bar so there's something to see through the glass. |
 

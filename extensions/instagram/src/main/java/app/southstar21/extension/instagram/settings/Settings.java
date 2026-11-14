@@ -69,6 +69,18 @@ public final class Settings {
         return appContext;
     }
 
+    /**
+     * Calls {@code listener} whenever a stored setting changes. The preferences hold
+     * listeners weakly, so keep a reference. Returns false if the preferences aren't
+     * available yet.
+     */
+    public static boolean addChangeListener(SharedPreferences.OnSharedPreferenceChangeListener listener) {
+        SharedPreferences prefs = preferencesOrNull();
+        if (prefs == null) return false;
+        prefs.registerOnSharedPreferenceChangeListener(listener);
+        return true;
+    }
+
     static SharedPreferences preferencesOrNull() {
         if (preferences == null) {
             try {

@@ -315,44 +315,18 @@ public final class SettingsMenu {
                 enabled -> setEnabled(dependent, enabled)));
         list.addView(main);
 
-        for (SettingsGroup group : patch.groups) {
-            View headerView = sectionHeader(group.title);
-            list.addView(headerView);
-            LinearLayout groupCard = cardView();
-            List<Setting> shown = new ArrayList<>();
-            for (Setting setting : group.settings) {
-                if (setting.shownWhen == null || setting.shownWhen.get()) shown.add(setting);
-            }
-            for (int i = 0; i < shown.size(); i++) {
-                Setting setting = shown.get(i);
-                if (i > 0) groupCard.addView(dividerView(false));
-                if (setting instanceof TimeSetting) {
-                    groupCard.addView(timeRow((TimeSetting) setting));
-                } else if (setting instanceof StringSetting) {
-                    groupCard.addView(textRow((StringSetting) setting));
-                } else if (setting instanceof ActionSetting) {
-                    groupCard.addView(buttonRow((ActionSetting) setting));
-                } else if (setting instanceof IntSetting) {
-                    groupCard.addView(sliderRow((IntSetting) setting));
-                } else {
-                    // Switching a setting that others depend on shows or hides them.
-                    boolean hasDependents = false;
-                    for (Setting other : patch.settings) {
-                        if (other.shownWhen == setting) hasDependents = true;
-                    }
-                    groupCard.addView(switchRow((BooleanSetting) setting, setting.title, setting.summary,
-                            hasDependents ? checked -> replaceTop() : null));
-                }
-            }
-            list.addView(groupCard);
-            dependent.add(headerView);
-            dependent.add(groupCard);
-            if (!TextUtils.isEmpty(group.footer)) {
-                View footer = sectionFooter(group.footer);
-                list.addView(footer);
-                dependent.add(footer);
-            }
+        if (patch.preview != null) {
+            View space = sectionHeader(null);
+            list.addView(space);
+            LinearLayout customize = cardView();
+            customize.addView(navigationRow(patch.glyph, patch.color, patch.customizeTitle, patch.customizeSummary,
+                    "", () -> push(() -> buildCustomizePage(patch), true)));
+            list.addView(customize);
+            dependent.add(space);
+            dependent.add(customize);
         }
+
+        addGroups(list, patch, patch.groups, dependent, false);
         setEnabled(dependent, patch.enabled.get());
 
         list.addView(sectionHeader(null));
@@ -372,6 +346,93 @@ public final class SettingsMenu {
         list.addView(reset);
 
         return page("Patches", list);
+    }
+
+    /**
+     * A patch's customization page: its live preview pinned at the top, under the top bar,
+     * and its settings scrolling beneath. Sliders apply while they're dragged, so the preview
+     * follows the finger.
+     */
+    private View buildCustomizePage(PatchSettings patch) {
+        LinearLayout list = pageList();
+        addGroups(list, patch, patch.customizeGroups, new ArrayList<>(), true);
+
+        list.addView(sectionHeader(null));
+        LinearLayout reset = cardView();
+        TextView resetText = text("Reset to defaults", 16, ACCENT, false);
+        resetText.setGravity(Gravity.CENTER);
+        resetText.setMinHeight(dp(50));
+        resetText.setBackground(ripple());
+        resetText.setOnClickListener(v -> confirm("Reset " + patch.customizeTitle + "?",
+                "The bar goes back to its default look.", "Reset", () -> {
+                    patch.resetCustomization();
+                    replaceTop();
+                }));
+        reset.addView(resetText, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT));
+        list.addView(reset);
+
+        View preview = null;
+        try {
+            preview = patch.preview.create(activity, this::replaceTop);
+        } catch (Throwable t) {
+            android.util.Log.e("southstar21", "Preview failed", t);
+        }
+        return page(patch.title, list, preview);
+    }
+
+    /**
+     * Adds {@code groups} to {@code list} as titled cards, collecting their views in
+     * {@code dependent} so the patch's switch can grey them out.
+     *
+     * @param live sliders save while they're dragged rather than when let go
+     */
+    private void addGroups(LinearLayout list, PatchSettings patch, List<SettingsGroup> groups,
+                           List<View> dependent, boolean live) {
+        helpPatch = patch;
+        for (SettingsGroup group : groups) {
+            View headerView = sectionHeader(group.title);
+            list.addView(headerView);
+            LinearLayout groupCard = cardView();
+            List<Setting> shown = new ArrayList<>();
+            for (Setting setting : group.settings) {
+                if (setting.shownWhen == null || setting.shownWhen.get()) shown.add(setting);
+            }
+            for (int i = 0; i < shown.size(); i++) {
+                Setting setting = shown.get(i);
+                if (i > 0) groupCard.addView(dividerView(false));
+                if (setting instanceof TimeSetting) {
+                    groupCard.addView(timeRow((TimeSetting) setting));
+                } else if (setting instanceof StringSetting) {
+                    groupCard.addView(textRow((StringSetting) setting));
+                } else if (setting instanceof ActionSetting) {
+                    groupCard.addView(buttonRow((ActionSetting) setting));
+                } else if (setting instanceof IntSetting) {
+                    groupCard.addView(sliderRow((IntSetting) setting, live));
+                } else if (setting instanceof ChoiceSetting) {
+                    groupCard.addView(choiceRow((ChoiceSetting) setting));
+                } else {
+                    // Switching a setting that others depend on shows or hides them.
+                    boolean hasDependents = false;
+                    for (Setting other : patch.settings) {
+                        if (other.shownWhen == setting) hasDependents = true;
+                    }
+                    for (Setting other : patch.customizeSettings) {
+                        if (other.shownWhen == setting) hasDependents = true;
+                    }
+                    groupCard.addView(switchRow((BooleanSetting) setting, setting.title, setting.summary,
+                            hasDependents ? checked -> replaceTop() : null));
+                }
+            }
+            list.addView(groupCard);
+            dependent.add(headerView);
+            dependent.add(groupCard);
+            if (!TextUtils.isEmpty(group.footer)) {
+                View footer = sectionFooter(group.footer);
+                list.addView(footer);
+                dependent.add(footer);
+            }
+        }
     }
 
     /** "What is this?": what a patch does and what it's for, in plain words. */
@@ -423,6 +484,11 @@ public final class SettingsMenu {
      * the back button closes the menu.
      */
     private View page(String backLabel, LinearLayout content) {
+        return page(backLabel, content, null);
+    }
+
+    /** A page with {@code pinned} (e.g. a live preview) fixed between the top bar and the content. */
+    private View page(String backLabel, LinearLayout content, View pinned) {
         LinearLayout page = new LinearLayout(activity);
         page.setOrientation(LinearLayout.VERTICAL);
         page.setBackgroundColor(background);
@@ -448,6 +514,13 @@ public final class SettingsMenu {
         bar.addView(back, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, dp(48),
                 Gravity.START | Gravity.CENTER_VERTICAL));
         page.addView(bar, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(52)));
+
+        if (pinned != null) {
+            LinearLayout.LayoutParams pinnedLp = new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            pinnedLp.setMargins(dp(16), 0, dp(16), dp(4));
+            page.addView(pinned, pinnedLp);
+        }
 
         ScrollView scroll = new ScrollView(activity);
         scroll.setClipToPadding(false);
@@ -589,7 +662,7 @@ public final class SettingsMenu {
 
     private View switchRow(BooleanSetting setting, String title, String summary, BooleanListener listener) {
         LinearLayout row = rowContainer(dp(52));
-        row.addView(labels(title, summary, false), new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        row.addView(labels(title, summary, false, setting), new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
 
         Switch toggle = new Switch(activity);
         toggle.setChecked(setting.get());
@@ -608,6 +681,11 @@ public final class SettingsMenu {
     }
 
     private View sliderRow(IntSetting setting) {
+        return sliderRow(setting, false);
+    }
+
+    /** @param live save while dragging, so a live preview follows the finger */
+    private View sliderRow(IntSetting setting, boolean live) {
         LinearLayout row = rowContainer(dp(52));
         row.setOrientation(LinearLayout.VERTICAL);
         row.setGravity(Gravity.NO_GRAVITY);
@@ -615,7 +693,7 @@ public final class SettingsMenu {
 
         LinearLayout top = new LinearLayout(activity);
         top.setGravity(Gravity.CENTER_VERTICAL);
-        top.addView(labels(setting.title, setting.summary, false),
+        top.addView(labels(setting.title, setting.summary, false, setting),
                 new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
 
         TextView value = text(format(setting, setting.get()), 14, ACCENT, true);
@@ -643,6 +721,7 @@ public final class SettingsMenu {
             @Override
             public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
                 value.setText(format(setting, setting.min + progress));
+                if (live && fromUser) setting.set(setting.min + progress);
             }
 
             @Override
@@ -662,6 +741,170 @@ public final class SettingsMenu {
         trackLp.topMargin = dp(6);
         row.addView(track, trackLp);
         return row;
+    }
+
+    /**
+     * A choice: the title, then a row of color swatches (or text chips when the setting has no
+     * colors) with the chosen one ringed.
+     */
+    private View choiceRow(ChoiceSetting setting) {
+        LinearLayout row = rowContainer(dp(52));
+        row.setOrientation(LinearLayout.VERTICAL);
+        row.setGravity(Gravity.NO_GRAVITY);
+        row.setPadding(dp(16), dp(12), dp(16), dp(12));
+        TextView chosen = text(setting.labels[setting.get()], 14, ACCENT, true);
+        LinearLayout top = new LinearLayout(activity);
+        top.setGravity(Gravity.CENTER_VERTICAL);
+        top.addView(labels(setting.title, setting.summary, false, setting),
+                new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        top.addView(chosen);
+        row.addView(top);
+
+        LinearLayout options = new LinearLayout(activity);
+        options.setGravity(Gravity.CENTER_VERTICAL);
+        List<View> chips = new ArrayList<>();
+        for (int i = 0; i < setting.labels.length; i++) {
+            final int index = i;
+            View chip;
+            if (setting.colors != null) {
+                chip = new View(activity);
+                int color = setting.colors[i] != 0 ? setting.colors[i] : (dark ? 0xFF3A3A3C : 0xFFE5E5EA);
+                GradientDrawable dot = new GradientDrawable();
+                dot.setShape(GradientDrawable.OVAL);
+                dot.setColor(color);
+                chip.setBackground(dot);
+                LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(dp(30), dp(30));
+                lp.rightMargin = dp(10);
+                chip.setLayoutParams(lp);
+            } else {
+                TextView label = text(setting.labels[i], 14, textPrimary, false);
+                label.setPadding(dp(12), dp(6), dp(12), dp(6));
+                LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+                lp.rightMargin = dp(8);
+                label.setLayoutParams(lp);
+                chip = label;
+            }
+            chip.setContentDescription(setting.labels[i]);
+            chip.setOnClickListener(v -> {
+                setting.set(index);
+                if (setting.requiresRestart) markRestartNeeded();
+                chosen.setText(setting.labels[index]);
+                markChoice(setting, chips, index);
+            });
+            chips.add(chip);
+            options.addView(chip);
+        }
+        markChoice(setting, chips, setting.get());
+        android.widget.HorizontalScrollView scroller = new android.widget.HorizontalScrollView(activity);
+        scroller.setHorizontalScrollBarEnabled(false);
+        scroller.addView(options);
+        LinearLayout.LayoutParams scrollerLp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        scrollerLp.topMargin = dp(10);
+        row.addView(scroller, scrollerLp);
+        return row;
+    }
+
+    /** Rings the chosen swatch, or fills the chosen chip. */
+    private void markChoice(ChoiceSetting setting, List<View> chips, int chosen) {
+        for (int i = 0; i < chips.size(); i++) {
+            View chip = chips.get(i);
+            boolean on = i == chosen;
+            if (setting.colors != null) {
+                GradientDrawable dot = (GradientDrawable) chip.getBackground();
+                dot.setStroke(on ? dp(3) : 0, on ? ACCENT : Color.TRANSPARENT);
+                chip.setScaleX(on ? 1.08f : 1f);
+                chip.setScaleY(on ? 1.08f : 1f);
+            } else {
+                GradientDrawable pill = new GradientDrawable();
+                pill.setCornerRadius(dp(16));
+                pill.setColor(on ? ACCENT : (dark ? 0xFF2C2C2E : 0xFFE5E5EA));
+                chip.setBackground(pill);
+                ((TextView) chip).setTextColor(on ? Color.WHITE : textPrimary);
+            }
+        }
+    }
+
+    // endregion
+
+    // region Help
+
+    /**
+     * Slides up a sheet explaining {@code setting}: its name, a short looping demo of what it
+     * changes (when the patch has demos) and the explanation.
+     */
+    private void showHelp(PatchSettings patch, Setting setting) {
+        Dialog sheet = new Dialog(activity, dark
+                ? android.R.style.Theme_DeviceDefault_Dialog_NoActionBar
+                : android.R.style.Theme_DeviceDefault_Light_Dialog_NoActionBar);
+        LinearLayout content = new LinearLayout(activity);
+        content.setOrientation(LinearLayout.VERTICAL);
+        content.setPadding(dp(20), dp(10), dp(20), dp(20));
+        GradientDrawable shape = new GradientDrawable();
+        shape.setColor(card);
+        float r = dp(24);
+        shape.setCornerRadii(new float[]{r, r, r, r, 0, 0, 0, 0});
+        content.setBackground(shape);
+
+        View handle = new View(activity);
+        GradientDrawable handleShape = new GradientDrawable();
+        handleShape.setColor(textTertiary);
+        handleShape.setCornerRadius(dp(3));
+        handle.setBackground(handleShape);
+        LinearLayout.LayoutParams handleLp = new LinearLayout.LayoutParams(dp(36), dp(5));
+        handleLp.gravity = Gravity.CENTER_HORIZONTAL;
+        handleLp.bottomMargin = dp(14);
+        content.addView(handle, handleLp);
+
+        content.addView(text(setting.title, 22, textPrimary, true));
+
+        View demo = null;
+        if (patch != null && patch.demo != null) {
+            try {
+                demo = patch.demo.create(activity, setting);
+            } catch (Throwable t) {
+                android.util.Log.e("southstar21", "Demo failed", t);
+            }
+        }
+        if (demo != null) {
+            LinearLayout.LayoutParams demoLp = new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, dp(210));
+            demoLp.topMargin = dp(14);
+            content.addView(demo, demoLp);
+            TextView hint = text("Plays on its own. Touch it to try it yourself.", 13, textSecondary, false);
+            hint.setGravity(Gravity.CENTER);
+            hint.setPadding(0, dp(8), 0, 0);
+            content.addView(hint);
+        }
+
+        TextView body = text(setting.help, 16, textPrimary, false);
+        body.setLineSpacing(0, 1.2f);
+        body.setPadding(0, dp(14), 0, dp(18));
+        content.addView(body);
+
+        TextView done = text("Got it", 16, Color.WHITE, true);
+        done.setGravity(Gravity.CENTER);
+        done.setMinHeight(dp(48));
+        GradientDrawable pill = new GradientDrawable();
+        pill.setColor(ACCENT);
+        pill.setCornerRadius(dp(24));
+        done.setBackground(new RippleDrawable(ColorStateList.valueOf(0x40FFFFFF), pill, null));
+        done.setOnClickListener(v -> sheet.dismiss());
+        content.addView(done, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT));
+
+        sheet.setContentView(content);
+        Window window = sheet.getWindow();
+        if (window != null) {
+            window.setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            window.setGravity(Gravity.BOTTOM);
+            window.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+            window.setWindowAnimations(android.R.style.Animation_InputMethod);
+            window.setDimAmount(0.4f);
+        }
+        sheet.setCanceledOnTouchOutside(true);
+        sheet.show();
     }
 
     // endregion
@@ -783,9 +1026,36 @@ public final class SettingsMenu {
     }
 
     private LinearLayout labels(String title, String summary, boolean singleLineSummary) {
+        return labels(title, summary, singleLineSummary, null);
+    }
+
+    /** The patch whose settings are being laid out, for the rows' "?" buttons. */
+    private PatchSettings helpPatch;
+
+    /** Title and summary; with a {@code setting} that has help, a "?" button after the title. */
+    private LinearLayout labels(String title, String summary, boolean singleLineSummary, Setting setting) {
         LinearLayout labels = new LinearLayout(activity);
         labels.setOrientation(LinearLayout.VERTICAL);
-        labels.addView(text(title, 16, textPrimary, false));
+        if (setting != null && !TextUtils.isEmpty(setting.help)) {
+            LinearLayout titleRow = new LinearLayout(activity);
+            titleRow.setGravity(Gravity.CENTER_VERTICAL);
+            titleRow.addView(text(title, 16, textPrimary, false));
+            TextView help = text("?", 13, ACCENT, true);
+            help.setGravity(Gravity.CENTER);
+            GradientDrawable circle = new GradientDrawable();
+            circle.setShape(GradientDrawable.OVAL);
+            circle.setColor((ACCENT & 0x00FFFFFF) | (dark ? 0x40000000 : 0x24000000));
+            help.setBackground(circle);
+            help.setContentDescription("What " + title + " does");
+            PatchSettings patch = helpPatch;
+            help.setOnClickListener(v -> showHelp(patch, setting));
+            LinearLayout.LayoutParams helpLp = new LinearLayout.LayoutParams(dp(22), dp(22));
+            helpLp.leftMargin = dp(8);
+            titleRow.addView(help, helpLp);
+            labels.addView(titleRow);
+        } else {
+            labels.addView(text(title, 16, textPrimary, false));
+        }
         if (!TextUtils.isEmpty(summary)) {
             TextView s = text(summary, 13, textSecondary, false);
             s.setPadding(0, dp(2), dp(8), 0);

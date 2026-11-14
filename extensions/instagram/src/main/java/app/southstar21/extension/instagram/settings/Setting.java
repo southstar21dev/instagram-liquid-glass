@@ -28,6 +28,16 @@ public abstract class Setting {
         return (T) this;
     }
 
+    /** A longer explanation behind the setting's "?" button, or null for none. */
+    public String help;
+
+    /** Adds a "?" button to the setting's row that explains it with {@code text}. */
+    @SuppressWarnings("unchecked")
+    public <T extends Setting> T help(String text) {
+        this.help = text;
+        return (T) this;
+    }
+
     /** Forgets the stored value, falling back to the default. */
     public void reset() {
         Settings.preferences().edit().remove(key).apply();

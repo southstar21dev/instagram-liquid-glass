@@ -28,6 +28,27 @@ public final class PatchSettings {
     /** Shown behind the "What is this?" link on the patch's page: what it does, and what it's for. */
     public String aboutWhat, aboutWhy;
 
+    /** Builds a live preview pinned above the settings of the customization page. */
+    public interface PreviewFactory {
+        /** @param refresh rebuilds the page, e.g. after the preview applied a preset */
+        android.view.View create(android.app.Activity activity, Runnable refresh);
+    }
+
+    /** Builds a short looping demo of one setting, shown behind its "?" button. */
+    public interface DemoFactory {
+        android.view.View create(android.app.Activity activity, Setting setting);
+    }
+
+    /** Demos for the "?" buttons, or null to explain in words only. */
+    public DemoFactory demo;
+
+    /** An extra page of settings with a live preview, opened from the patch's page; null if none. */
+    public String customizeTitle, customizeSummary;
+    public PreviewFactory preview;
+    public List<SettingsGroup> customizeGroups = Collections.emptyList();
+    /** The settings of the customization page, for resetting. */
+    public List<Setting> customizeSettings = Collections.emptyList();
+
     /**
      * @param key      prefix for the stored values, e.g. "liquid_glass"
      * @param included usually the patch's {@code isIncluded()}, which the patch makes return true
@@ -69,6 +90,37 @@ public final class PatchSettings {
         return this;
     }
 
+    /**
+     * Adds a customization page: a live preview pinned at the top, with {@code groups} under
+     * it. It's opened from a row on the patch's page.
+     */
+    public PatchSettings customize(String title, String summary, PreviewFactory preview, SettingsGroup... groups) {
+        this.customizeTitle = title;
+        this.customizeSummary = summary;
+        this.preview = preview;
+        List<SettingsGroup> list = new ArrayList<>();
+        List<Setting> all = new ArrayList<>();
+        for (SettingsGroup group : groups) {
+            if (group.settings.isEmpty()) continue;
+            list.add(group);
+            all.addAll(group.settings);
+        }
+        this.customizeGroups = Collections.unmodifiableList(list);
+        this.customizeSettings = Collections.unmodifiableList(all);
+        return this;
+    }
+
+    /** Sets the demos shown behind the settings' "?" buttons. */
+    public PatchSettings demos(DemoFactory demo) {
+        this.demo = demo;
+        return this;
+    }
+
+    /** Forgets every stored value of the customization page. */
+    public void resetCustomization() {
+        for (Setting s : customizeSettings) s.reset();
+    }
+
     public boolean isIncluded() {
         try {
             return included.call();
@@ -86,5 +138,6 @@ public final class PatchSettings {
     public void reset() {
         enabled.reset();
         for (Setting s : settings) s.reset();
+        resetCustomization();
     }
 }
