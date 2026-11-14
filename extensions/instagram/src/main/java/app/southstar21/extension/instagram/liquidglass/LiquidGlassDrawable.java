@@ -154,6 +154,17 @@ final class LiquidGlassDrawable extends Drawable {
         glowPaint.setXfermode(new android.graphics.PorterDuffXfermode(android.graphics.PorterDuff.Mode.ADD));
     }
 
+    /** Copies of the video surfaces under the bar, drawn into its holes; null for none. */
+    private SurfaceSnapshots snapshots;
+
+    void setSnapshots(SurfaceSnapshots snapshots) {
+        this.snapshots = snapshots;
+    }
+
+    SurfaceSnapshots snapshots() {
+        return snapshots;
+    }
+
     void setPillInsets(int left, int right, int bottom) {
         insetLeft = left;
         insetRight = right;
@@ -378,6 +389,8 @@ final class LiquidGlassDrawable extends Drawable {
 
         if (backdrop == null) {
             backdrop = new RenderNode("LiquidGlassBackdrop");
+            // Its own layer, so the base color can be filled in behind what's recorded.
+            backdrop.setUseCompositingLayer(true, null);
             refracted = new RenderNode("LiquidGlassRefraction");
             clipped = new RenderNode("LiquidGlassClip");
         }
@@ -389,7 +402,6 @@ final class LiquidGlassDrawable extends Drawable {
 
         RecordingCanvas rc = backdrop.beginRecording(w, h);
         try {
-            rc.drawColor(dark ? Color.BLACK : Color.WHITE);
             rc.translate(pad - originX, pad - originY);
             for (int i = 0; i < hostIndex; i++) {
                 View child = parent.getChildAt(i);
@@ -402,6 +414,10 @@ final class LiquidGlassDrawable extends Drawable {
                 child.draw(rc);
                 rc.restoreToCount(save);
             }
+            // Videos playing under the bar are holes in the recording: fill them with copies,
+            // then the base color behind whatever is still empty.
+            if (snapshots != null) snapshots.draw(rc);
+            rc.drawColor(dark ? Color.BLACK : Color.WHITE, android.graphics.PorterDuff.Mode.DST_OVER);
         } finally {
             backdrop.endRecording();
         }

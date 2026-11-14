@@ -1079,6 +1079,7 @@ final class LiquidGlassLens extends View {
 
         if (scene == null) {
             scene = new RenderNode("LiquidGlassLensScene");
+            scene.setUseCompositingLayer(true, null);
             clip = new RenderNode("LiquidGlassLensClip");
         }
 
@@ -1091,7 +1092,6 @@ final class LiquidGlassLens extends View {
         } else {
             RecordingCanvas rc = scene.beginRecording(w, h);
             try {
-                rc.drawColor(dark ? Color.BLACK : Color.WHITE);
                 rc.translate(-originX, -originY);
                 for (int i = 0; i <= barIndex; i++) {
                     View child = parent.getChildAt(i);
@@ -1101,6 +1101,10 @@ final class LiquidGlassLens extends View {
                     child.draw(rc);
                     rc.restoreToCount(save);
                 }
+                // Videos under the bar are holes in the recording: fill them, then the base.
+                SurfaceSnapshots snapshots = glass.snapshots();
+                if (snapshots != null) snapshots.draw(rc);
+                rc.drawColor(dark ? Color.BLACK : Color.WHITE, android.graphics.PorterDuff.Mode.DST_OVER);
             } finally {
                 scene.endRecording();
             }
@@ -1150,6 +1154,7 @@ final class LiquidGlassLens extends View {
                                  float originX, float originY, float p) {
         if (dropPage == null) {
             dropPage = new RenderNode("LiquidGlassDropPage");
+            dropPage.setUseCompositingLayer(true, null);
             dropPageBlur = new RenderNode("LiquidGlassDropPageBlur");
             dropCapsule = new RenderNode("LiquidGlassDropCapsule");
         }
@@ -1158,7 +1163,6 @@ final class LiquidGlassLens extends View {
         dropPage.setPosition(0, 0, w, h);
         RecordingCanvas pc = dropPage.beginRecording(w, h);
         try {
-            pc.drawColor(dark ? Color.BLACK : Color.WHITE);
             pc.translate(-originX, -originY);
             for (int i = 0; i < barIndex; i++) {
                 View child = parent.getChildAt(i);
@@ -1168,6 +1172,10 @@ final class LiquidGlassLens extends View {
                 child.draw(pc);
                 pc.restoreToCount(save);
             }
+            // Videos are holes in the recording: fill them, then the base color.
+            SurfaceSnapshots snapshots = glass.snapshots();
+            if (snapshots != null) snapshots.draw(pc);
+            pc.drawColor(dark ? Color.BLACK : Color.WHITE, android.graphics.PorterDuff.Mode.DST_OVER);
         } finally {
             dropPage.endRecording();
         }

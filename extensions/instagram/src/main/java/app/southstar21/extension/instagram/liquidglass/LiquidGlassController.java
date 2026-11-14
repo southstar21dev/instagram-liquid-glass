@@ -36,6 +36,9 @@ final class LiquidGlassController implements ViewTreeObserver.OnPreDrawListener 
     /** Siblings whose bottom margin reserves room for the tab bar, and which we now manage. */
     private final java.util.WeakHashMap<View, Boolean> managedContent = new java.util.WeakHashMap<>();
     private final BackdropSampler sampler;
+    /** Copies of videos playing under the bar, which the glass can't record (see SurfaceSnapshots). */
+    private final SurfaceSnapshots snapshots;
+    private final android.graphics.RectF snapshotRegion = new android.graphics.RectF();
     private final android.graphics.Rect sampleRect = new android.graphics.Rect();
     private final float density;
     /** Progressive blur behind the pill. Null if it can't be added. */
@@ -70,6 +73,8 @@ final class LiquidGlassController implements ViewTreeObserver.OnPreDrawListener 
         this.lens = new LiquidGlassLens(bar.getContext(), bar, glass, density, styleSource);
         this.reelsTabId = bar.getResources().getIdentifier("clips_tab", "id", "com.instagram.android");
         this.sampler = new BackdropSampler(bar, glass::setBackdropLuminance);
+        this.snapshots = new SurfaceSnapshots(bar);
+        glass.setSnapshots(snapshots);
     }
 
     LiquidGlassLens lens() {
@@ -102,6 +107,7 @@ final class LiquidGlassController implements ViewTreeObserver.OnPreDrawListener 
         if (parent.getClipChildren()) parent.setClipChildren(false);
         if (parent instanceof FrameLayout) {
             bottomBlur = new EdgeBlurView(bar.getContext(), density);
+            bottomBlur.setSnapshots(snapshots);
             parent.addView(bottomBlur, parent.indexOfChild(bar),
                     new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, android.view.Gravity.BOTTOM));
         }
@@ -161,6 +167,14 @@ final class LiquidGlassController implements ViewTreeObserver.OnPreDrawListener 
     public boolean onPreDraw() {
         try {
             enforce();
+            if (bar.getVisibility() == View.VISIBLE && !preview) {
+                // Copy the videos under the bar, its glass and lens (which pokes out above it) and
+                // the edge blur, down to the bottom of the screen.
+                ViewGroup parent = (ViewGroup) bar.getParent();
+                float top = bar.getTop() + bar.getTranslationY() - dp(100);
+                snapshotRegion.set(bar.getLeft(), top, bar.getRight(), Math.max(top, parent.getHeight() + bottomInset));
+                snapshots.update(snapshotRegion);
+            }
             if (bar.getVisibility() == View.VISIBLE) {
                 // Content behind the bar may have changed this frame. Invalidating during
                 // pre-draw folds the redraw into the current frame instead of scheduling a new one.
