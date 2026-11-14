@@ -73,6 +73,12 @@ Patched apps are signed with a different key, so uninstall the Play Store versio
 
 Instagram's iOS 26 Liquid Glass design on Android, matched against screen recordings of the iOS app.
 
+| iOS style (default) | southstar21 style |
+|:---:|:---:|
+| <img src=".github/readme/liquid-glass-ios-style.gif" width="400" alt="The iOS style bar: a grey capsule glides between tabs, and the bar zooms in, turns liquid and rubber-bands past its ends while dragged"> | <img src=".github/readme/liquid-glass-southstar21-style.gif" width="400" alt="The southstar21 style bar: pressing swells the selection into a drop of glass that is dragged between tabs while the bar shrinks back behind it"> |
+
+<sub>Recorded in the live preview on the Customize navbar page, over its sample feed.</sub>
+
 - **Floating glass tab bar.** A frosted pill with live background blur, a subtle refracting rim and a grey capsule behind the selected tab.
 - **Shrinks while scrolling.** Scrolling down scales the whole bar down (every tab stays visible and tappable), scrolling up brings it back.
 - **Gliding selection.** Drag along the bar to slide the grey selection capsule between tabs, as on iOS, with a haptic tick per tab; let go to open the tab underneath. Switch on *Glass while dragging* to turn the capsule into clear glass while it moves.
