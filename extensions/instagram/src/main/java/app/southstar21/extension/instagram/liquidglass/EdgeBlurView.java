@@ -100,9 +100,14 @@ final class EdgeBlurView extends View {
                 child.draw(rc);
                 rc.restoreToCount(save);
             }
-            // Videos are holes in the recording: fill them with copies, then the base color.
-            if (snapshots != null) snapshots.draw(rc);
-            rc.drawColor(dark ? Color.BLACK : Color.WHITE, PorterDuff.Mode.DST_OVER);
+            // Videos are holes in the recording: fill them with copies where those work, then
+            // the base color (for the window's background) everywhere but uncopied videos.
+            if (snapshots != null) {
+                snapshots.draw(rc);
+                snapshots.drawBase(rc, dark ? Color.BLACK : Color.WHITE);
+            } else {
+                rc.drawColor(dark ? Color.BLACK : Color.WHITE, PorterDuff.Mode.DST_OVER);
+            }
         } finally {
             backdrop.endRecording();
         }

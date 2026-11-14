@@ -21,17 +21,19 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Copies of the video surfaces playing under the bar.
+ * The video surfaces playing under the bar, and copies of them where the system allows it.
  * <p>
  * Instagram plays feed videos in SurfaceViews, which the system composites as separate layers:
  * their pixels never pass through the view hierarchy, so when the glass re-records what's
  * behind it, a playing video is only a transparent hole there. Left alone the glass filled
  * the hole with its base color and turned solid, and the edge blur had nothing to blur.
  * <p>
- * So each frame, every SurfaceView under the bar is copied with {@link PixelCopy}, small (the
- * copy is blurred anyway), and {@link #draw} puts the latest copy into the hole: drawn
- * behind what's already recorded, so the video's own overlays (mute button, captions) stay on
- * top of it.
+ * So the recordings fill their base color everywhere except the visible videos
+ * ({@link #drawBase}), and the live video shows through the glass there. Where a surface can be
+ * copied with {@link PixelCopy}, {@link #draw} also puts a small copy (blurred anyway) into the
+ * hole, behind the video's own overlays (mute button, captions). Instagram's player draws into
+ * a separate layer under its SurfaceView, so its copies come back empty ("no data"); those
+ * surfaces are only retried now and then.
  */
 @SuppressLint("NewApi")
 final class SurfaceSnapshots {
@@ -49,12 +51,17 @@ final class SurfaceSnapshots {
     private final RectF bounds = new RectF();
     private final RectF clip = new RectF();
     private long lastScan;
+    /** How long to wait before trying again to copy a surface that had nothing to copy. */
+    private static final long RETRY_MS = 3000;
 
     private static final class Entry {
         final WeakReference<SurfaceView> view;
         /** The latest finished copy, and the one being copied into. */
         Bitmap shown, spare;
         boolean inFlight;
+        /** When copying may be tried again after a failure; logged once per surface. */
+        long retryAt;
+        boolean failureLogged;
 
         Entry(SurfaceView view) {
             this.view = new WeakReference<>(view);
@@ -85,8 +92,29 @@ final class SurfaceSnapshots {
             SurfaceView view = entry.view.get();
             if (!usable(view) || !visibleBounds(view)) continue;
             if (!RectF.intersects(clip, region)) continue;
+            if (now < entry.retryAt) continue;
             request(entry, view);
         }
+    }
+
+    /**
+     * Fills {@code color} behind what {@code canvas} (in the bar's parent's coordinates) holds,
+     * standing in for the window's background, except where a video is visible: there the
+     * recording stays transparent so the live video shows through.
+     */
+    void drawBase(Canvas canvas, int color) {
+        int save = canvas.save();
+        if (!entries.isEmpty() && bar.getParent() instanceof ViewGroup) {
+            ((ViewGroup) bar.getParent()).getLocationInWindow(parentLocation);
+            for (Entry entry : entries) {
+                SurfaceView view = entry.view.get();
+                // A copy fills the hole itself; leave only uncopied videos open.
+                if (entry.shown != null || !usable(view) || !visibleBounds(view)) continue;
+                canvas.clipOutRect(clip);
+            }
+        }
+        canvas.drawColor(color, PorterDuff.Mode.DST_OVER);
+        canvas.restoreToCount(save);
     }
 
     /**
@@ -139,7 +167,18 @@ final class SurfaceSnapshots {
             // The whole surface, scaled into the small bitmap; drawn back over the view's bounds.
             PixelCopy.request(view, target, result -> {
                 entry.inFlight = false;
-                if (result != PixelCopy.SUCCESS) return;
+                if (result != PixelCopy.SUCCESS) {
+                    // Nothing to copy (the player draws into a layer of its own): the live video
+                    // shows through instead. Try again later rather than every frame.
+                    entry.retryAt = SystemClock.uptimeMillis() + RETRY_MS;
+                    entry.shown = null;
+                    if (!entry.failureLogged) {
+                        entry.failureLogged = true;
+                        android.util.Log.i(LiquidGlassNavBarPatch.TAG, "Can't copy the video under the bar "
+                                + "(PixelCopy result " + result + "), letting it show through instead");
+                    }
+                    return;
+                }
                 Bitmap previous = entry.shown;
                 entry.shown = target;
                 entry.spare = previous;
@@ -147,6 +186,7 @@ final class SurfaceSnapshots {
         } catch (RuntimeException e) {
             // A surface torn down between the check and the copy.
             entry.inFlight = false;
+            entry.retryAt = SystemClock.uptimeMillis() + RETRY_MS;
         }
     }
 

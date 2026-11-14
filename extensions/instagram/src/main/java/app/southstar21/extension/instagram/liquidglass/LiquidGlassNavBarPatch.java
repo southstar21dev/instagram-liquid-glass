@@ -58,6 +58,13 @@ public final class LiquidGlassNavBarPatch {
     static final BooleanSetting SHRINK_ON_SCROLL = new BooleanSetting("liquid_glass_shrink_on_scroll",
             "Shrink while scrolling", "Scrolling down shrinks the bar, scrolling up restores it.", false, true)
             .help("Scrolling down a feed shrinks the bar out of the way, scrolling back up brings it back.");
+    static final BooleanSetting BLUR_VIDEOS = new BooleanSetting("liquid_glass_blur_videos",
+            "Blur videos behind the bar", "Plays videos so the glass can see them, and blurs them like the rest "
+            + "of the feed.", true, true)
+            .help("Instagram plays videos in a separate layer that apps can't read, so over a playing video the "
+                    + "glass and the blur at the bottom of the screen had nothing to blur. With this on, videos "
+                    + "play the other way Instagram supports, which the glass can see. Takes effect after "
+                    + "Instagram restarts.");
     static final BooleanSetting HAPTICS = new BooleanSetting("liquid_glass_haptics",
             "Haptics", "A tick when the selection glides over a tab.", false, true)
             .help("A light tick each time the selection glides over another tab while you drag it.");
@@ -67,7 +74,7 @@ public final class LiquidGlassNavBarPatch {
             "iOS 26 style glass tab bar. Defaults come from the patch options in Morphe Manager.",
             LiquidGlassNavBarPatch::isIncluded,
             new SettingsGroup("Behavior", EXTEND_CONTENT, SHRINK_ON_SCROLL,
-                    NavbarStyle.SHRUNK_SIZE.shownWhen(SHRINK_ON_SCROLL), HAPTICS))
+                    NavbarStyle.SHRUNK_SIZE.shownWhen(SHRINK_ON_SCROLL), BLUR_VIDEOS, HAPTICS))
             .customize("Customize navbar", "Glass, shape and selection, with a live preview.",
                     NavbarPreview::customizer,
                     new SettingsGroup("Style", "The southstar21 style moves differently: the bar shrinks back "
@@ -110,6 +117,20 @@ public final class LiquidGlassNavBarPatch {
 
     public static boolean extendContentBehindBar() {
         return true;
+    }
+
+    /**
+     * Called by the patch with the video player's answer to "play in a SurfaceView?". A
+     * SurfaceView is a layer of its own the glass can't record, so with Blur videos on this says
+     * no and Instagram uses its TextureView player, which draws with the rest of the app.
+     */
+    public static boolean useSurfaceView(boolean original) {
+        try {
+            if (original && SETTINGS.isActive() && BLUR_VIDEOS.get()) return false;
+        } catch (Throwable t) {
+            Log.e(TAG, "SurfaceView check failed", t);
+        }
+        return original;
     }
 
     /** Called by {@link InstagramHooks} when this patch is included and switched on. */

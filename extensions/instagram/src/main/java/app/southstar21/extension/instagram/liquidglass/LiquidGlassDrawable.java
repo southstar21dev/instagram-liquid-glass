@@ -79,7 +79,9 @@ final class LiquidGlassDrawable extends Drawable {
             "  col.r = content.eval(coord + offset * 1.06).r;\n" +
             "  col.g = content.eval(coord + offset).g;\n" +
             "  col.b = content.eval(coord + offset * 0.94).b;\n" +
-            "  col.a = 1.0;\n" +
+            // Kept, not forced opaque: a video plays in a hole of the recording (its own layer,
+            // under the window), and the glass must let it show through rather than go solid.
+            "  col.a = content.eval(coord + offset).a;\n" +
 
             // Vibrancy: glass slightly boosts saturation of what's behind it.
             "  half luma = dot(col.rgb, half3(0.2126, 0.7152, 0.0722));\n" +
@@ -87,7 +89,10 @@ final class LiquidGlassDrawable extends Drawable {
             // As on iOS: dense in the body, clearing towards the edge so what the rim bends in
             // from outside shows there.
             "  float clearing = 1.0 - smoothstep(0.0, edgeWidth, -d);\n" +
-            "  col.rgb = mix(col.rgb, tint.rgb, tint.a * (1.0 - edgeClear * clearing * clearing));\n" +
+            "  half amount = tint.a * (1.0 - edgeClear * clearing * clearing);\n" +
+            // Premultiplied: the material covers holes too, as much as it covers content.
+            "  col.rgb = mix(col.rgb, tint.rgb, amount);\n" +
+            "  col.a = mix(col.a, 1.0, amount);\n" +
 
             // Specular rim, lit from the top left with a softer bounce bottom right.
             "  float rim = smoothstep(0.55, 1.0, t);\n" +
@@ -100,7 +105,9 @@ final class LiquidGlassDrawable extends Drawable {
             "  float top = 1.0 - smoothstep(0.0, size.y * 0.55, coord.y - origin.y);\n" +
             "  col.rgb += half3(top * mix(0.06, 0.03, dark));\n" +
 
-            "  return clamp(col, 0.0, 1.0) * coverage;\n" +
+            "  col = clamp(col, 0.0, 1.0);\n" +
+            "  col.rgb = min(col.rgb, half3(col.a));\n" +
+            "  return col * coverage;\n" +
             "}\n";
 
     private final View host;
@@ -414,10 +421,15 @@ final class LiquidGlassDrawable extends Drawable {
                 child.draw(rc);
                 rc.restoreToCount(save);
             }
-            // Videos playing under the bar are holes in the recording: fill them with copies,
-            // then the base color behind whatever is still empty.
-            if (snapshots != null) snapshots.draw(rc);
-            rc.drawColor(dark ? Color.BLACK : Color.WHITE, android.graphics.PorterDuff.Mode.DST_OVER);
+            // Videos playing under the bar are holes in the recording: fill them with copies
+            // where those work, then the base color (for the window's background) everywhere
+            // else, leaving uncopied videos open so the live video shows through the glass.
+            if (snapshots != null) {
+                snapshots.draw(rc);
+                snapshots.drawBase(rc, dark ? Color.BLACK : Color.WHITE);
+            } else {
+                rc.drawColor(dark ? Color.BLACK : Color.WHITE, android.graphics.PorterDuff.Mode.DST_OVER);
+            }
         } finally {
             backdrop.endRecording();
         }

@@ -99,7 +99,7 @@ final class LiquidGlassLens extends View {
             "uniform float radius;\n" +
             "uniform float mag;\n" +
             "uniform float band;\n" +                // refractionHeight
-            "uniform float amount;\n" +              // refractionAmount, negative samples inward
+            "uniform float amount;\n" +              // refractionAmount: positive samples outside the edge, negative inside
             "uniform float chromaticAberration;\n" +
             "uniform float darken;\n" +
             "uniform float innerRadius;\n" +
@@ -1046,8 +1046,12 @@ final class LiquidGlassLens extends View {
         // No magnification of the page; the icons are drawn 1.2x larger instead (dropScene).
         dropShader.setFloatUniform("mag", 1f);
         dropShader.setFloatUniform("band", 10f * density * scale);
-        // Negative: the rim shows what's inside the drop, stretched out to its edge.
-        dropShader.setFloatUniform("amount", -amount);
+        // The bar copy fades out towards the rim, so the rim is clear (see recordDropScene).
+        dropBand = 10f * density * scale;
+        dropRadius = r;
+        // Positive: the rim bends in what's just outside the drop, so its sides are clear glass
+        // showing what's around it (the page above and below the bar), with rainbow edges.
+        dropShader.setFloatUniform("amount", amount);
         dropShader.setFloatUniform("chromaticAberration", ca);
         dropShader.setFloatUniform("darken", 0f);
         dropShader.setFloatUniform("innerRadius", (3f + 5f * p) * density * scale);
@@ -1137,6 +1141,11 @@ final class LiquidGlassLens extends View {
         canvas.restoreToCount(save);
     }
 
+    /** The drop's rim width and corner radius, for fading the bar copy out towards the rim. */
+    private float dropBand, dropRadius;
+    private RenderNode dropFade, dropCapsuleSoft;
+    private RenderEffect dropFadeBlur;
+    private float dropFadeBlurRadius;
     private RenderNode dropPage;
     private RenderNode dropPageBlur;
     private RenderNode dropCapsule;
@@ -1226,7 +1235,7 @@ final class LiquidGlassLens extends View {
         RecordingCanvas rc = scene.beginRecording(w, h);
         try {
             rc.drawRenderNode(dropPage);
-            if (capsule) rc.drawRenderNode(dropCapsule);
+            if (capsule) rc.drawRenderNode(softCapsule(w, h));
             // The tab icons, 1.2x larger as the drop swells, each around its own center.
             float grow = 1f + 0.2f * Math.max(0f, Math.min(1f, p));
             rc.translate(-originX + bar.getLeft() + bar.getTranslationX(),
@@ -1244,6 +1253,53 @@ final class LiquidGlassLens extends View {
         } finally {
             scene.endRecording();
         }
+    }
+
+    /**
+     * The bar copy faded out towards the drop's rim: inside the rim it shows, through the rim it
+     * fades softly to nothing, so the rim is clear glass over the page around the drop without
+     * a hard edge where the copy stops. {@code w} by {@code h} is the drop's scene.
+     */
+    private RenderNode softCapsule(int w, int h) {
+        if (dropFade == null) {
+            dropFade = new RenderNode("LiquidGlassDropFade");
+            Paint keep = new Paint();
+            keep.setXfermode(new android.graphics.PorterDuffXfermode(android.graphics.PorterDuff.Mode.DST_IN));
+            dropFade.setUseCompositingLayer(true, keep);
+            dropCapsuleSoft = new RenderNode("LiquidGlassDropCapsuleSoft");
+            dropCapsuleSoft.setUseCompositingLayer(true, null);
+        }
+        float padX = (w - lens.width()) / 2f, padY = (h - lens.height()) / 2f;
+        float b = Math.max(1f, Math.min(dropBand, Math.min(lens.width(), lens.height()) / 2f - 1f));
+        float ir = Math.max(0f, dropRadius - b * 0.6f);
+
+        // The mask: the drop a little inside its rim, blurred across the rim.
+        float blur = b * 0.6f;
+        if (dropFadeBlur == null || dropFadeBlurRadius != blur) {
+            dropFadeBlurRadius = blur;
+            dropFadeBlur = RenderEffect.createBlurEffect(blur, blur, Shader.TileMode.DECAL);
+        }
+        dropFade.setPosition(0, 0, w, h);
+        RecordingCanvas mc = dropFade.beginRecording(w, h);
+        try {
+            fill.setColor(Color.WHITE);
+            float inset = b * 0.6f;
+            mc.drawRoundRect(padX + inset, padY + inset, padX + lens.width() - inset, padY + lens.height() - inset,
+                    ir, ir, fill);
+        } finally {
+            dropFade.endRecording();
+        }
+        dropFade.setRenderEffect(dropFadeBlur);
+
+        dropCapsuleSoft.setPosition(0, 0, w, h);
+        RecordingCanvas sc = dropCapsuleSoft.beginRecording(w, h);
+        try {
+            sc.drawRenderNode(dropCapsule);
+            sc.drawRenderNode(dropFade);
+        } finally {
+            dropCapsuleSoft.endRecording();
+        }
+        return dropCapsuleSoft;
     }
 
     private static float lerp(float a, float b, float t) {
