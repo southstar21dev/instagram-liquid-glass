@@ -1,3 +1,9 @@
+## [1.2.0-dev.6](https://github.com/southstar21dev/southstar21-patches/compare/v1.2.0-dev.5...v1.2.0-dev.6) (2026-11-14)
+
+### 🐛 Bug Fixes
+
+* **Liquid Glass navigation bar:** Blur over autoplaying videos ([6424985](https://github.com/southstar21dev/southstar21-patches/commit/642498537b82ac4431f5770eda0717064e950c25))
+
 ## [1.2.0-dev.5](https://github.com/southstar21dev/southstar21-patches/compare/v1.2.0-dev.4...v1.2.0-dev.5) (2026-11-14)
 
 ### ✨ New Features
