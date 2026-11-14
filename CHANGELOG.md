@@ -1,3 +1,9 @@
+## [1.2.0-dev.7](https://github.com/southstar21dev/southstar21-patches/compare/v1.2.0-dev.6...v1.2.0-dev.7) (2026-11-14)
+
+### ✨ New Features
+
+* **Liquid Glass navigation bar:** Blur videos behind the bar ([1a2e3eb](https://github.com/southstar21dev/southstar21-patches/commit/1a2e3ebfb8e991d5adee95344028d6e497069ce4))
+
 ## [1.2.0-dev.6](https://github.com/southstar21dev/southstar21-patches/compare/v1.2.0-dev.5...v1.2.0-dev.6) (2026-11-14)
 
 ### 🐛 Bug Fixes
