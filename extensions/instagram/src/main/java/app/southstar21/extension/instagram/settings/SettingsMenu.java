@@ -1117,7 +1117,9 @@ public final class SettingsMenu {
 
     private static String format(IntSetting setting, int value) {
         if (setting.unit == null) return String.valueOf(value);
-        // Units like "%", ":00" or "×" go straight after the number.
+        // An hour of the day, shown like the times picked with a time picker: "4:00 AM" or "4:00".
+        if (":00".equals(setting.unit)) return TimeSetting.format(value * 60);
+        // Units like "%" or "×" go straight after the number.
         boolean attached = "%".equals(setting.unit) || setting.unit.startsWith(":") || "×".equals(setting.unit);
         return attached ? value + setting.unit : value + " " + setting.unit;
     }

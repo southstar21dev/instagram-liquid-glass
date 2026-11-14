@@ -23,7 +23,6 @@ import android.widget.FrameLayout;
 
 import java.lang.ref.WeakReference;
 import java.util.ArrayList;
-import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -38,8 +37,8 @@ import app.southstar21.extension.instagram.consciousgate.ConsciousGatePatch.Reas
  * Instagram's screens are fragments, and the root view of each carries its fragment in a view
  * tag. Every fragment names itself through {@code getModuleName()}, which isn't obfuscated:
  * "feed_timeline" for the home feed, "clips_viewer_*" for Reels, "reel_*" for stories,
- * "explore_popular" for Explore, "serp_*" for search results ("serp_users" is the Accounts tab,
- * which stays open) and "feed_contextual_*" for post feeds. Each gated screen's surface (its
+ * "explore_popular" for Explore, "serp_*" for search results (the tabs that list accounts stay
+ * open) and "feed_contextual_*" for post feeds. Each gated screen's surface (its
  * largest list, or the whole screen for stories) is frosted with a blur on Android 12+ plus a
  * tint, and covered by the {@link GateView}, which is kept over the surface every frame.
  */
@@ -60,10 +59,14 @@ final class GatedScreens {
     private static final float MAX_TINT_WITHOUT_BLUR = 0.9f;
     private static final long THAW_MS = 700;
 
-    /** Headers over each kind's surface, which stay usable, by view id. */
+    /**
+     * Headers over each kind's surface, which stay usable, by view id. The home feed's header
+     * is "action_bar_container" while it shows the Instagram logo. Reels opened from a profile
+     * or elsewhere outside the Reels tab have the generic action bar, with a back button.
+     */
     private static final String[][] HEADER_IDS = {
-            {"main_feed_action_bar_container", "main_feed_action_bar"},
-            {"clips_viewer_action_bar"},
+            {"main_feed_action_bar_container", "main_feed_action_bar", "action_bar_container"},
+            {"clips_viewer_action_bar", "action_bar_container", "action_bar"},
             {"explore_action_bar"},
             {},
             {"action_bar_container"},
@@ -79,18 +82,34 @@ final class GatedScreens {
     /** Surfaces of the gated screens on screen right now, and what each one is. */
     private final List<WeakReference<View>> onScreen = new ArrayList<>();
     private final WeakHashMap<View, Kind> kinds = new WeakHashMap<>();
-    private final WeakHashMap<View, Object> fragments = new WeakHashMap<>();
+    /**
+     * Each surface's fragment and the fragment's root view. Held weakly: they hold the surface,
+     * which would otherwise never leave these maps.
+     */
+    private final WeakHashMap<View, WeakReference<Object>> fragments = new WeakHashMap<>();
+    private final WeakHashMap<View, WeakReference<View>> roots = new WeakHashMap<>();
     /** Frost level and tint of every surface frosted so far. */
     private final WeakHashMap<View, Float> applied = new WeakHashMap<>();
     private final WeakHashMap<View, ColorDrawable> tints = new WeakHashMap<>();
-    /** Reels and stories screens paused behind a closed gate: when last, and how often. */
-    private final WeakHashMap<Object, long[]> paused = new WeakHashMap<>();
+    /** Reels and stories screens paused behind a closed gate, by fragment. */
+    private final WeakHashMap<Object, Paused> paused = new WeakHashMap<>();
     private static final long REPAUSE_MS = 1000;
     private static final int MAX_PAUSES = 8;
-    private final Map<Kind, View> headers = new EnumMap<>(Kind.class);
+    /** The header found over each surface, and when it was last looked for. */
+    private final WeakHashMap<View, WeakReference<View>> headers = new WeakHashMap<>();
+    private long headerSearch;
+
+    /** A paused screen: when last, how often, and its surface, to tell if it's still showing. */
+    private static final class Paused {
+        long at;
+        int count;
+        WeakReference<View> surface;
+    }
 
     private final Rect rect = new Rect();
     private final Rect otherRect = new Rect();
+    private final int[] surfaceLocation = new int[2];
+    private final int[] contentLocation = new int[2];
     private float level;
     private Reason reason = Reason.OPEN;
     private long lastScan;
@@ -115,6 +134,11 @@ final class GatedScreens {
             public boolean onPreDraw() {
                 try {
                     if (level > 0f || reason != Reason.OPEN) {
+                        // Switched off in the menu: the gate comes off right away.
+                        if (!ConsciousGatePatch.SETTINGS.isActive()) {
+                            thaw();
+                            return true;
+                        }
                         if (SystemClock.uptimeMillis() - lastScan >= ACTIVE_RESCAN_MS) refresh();
                         syncGate();
                     }
@@ -139,11 +163,14 @@ final class GatedScreens {
         return !onScreen.isEmpty();
     }
 
-    /** Clears the frost after the gate opens for extra time, or today is reset. */
+    /** Clears the frost after the gate opens for extra time, today is reset, or the patch is switched off. */
     void thaw() {
         level = 0f;
         reason = Reason.OPEN;
-        hideGate();
+        if (gate != null) {
+            gate.leave();
+            gate = null;
+        }
         resumeMedia();
         if (thawAnimator != null) thawAnimator.cancel();
         float from = 0f;
@@ -177,8 +204,9 @@ final class GatedScreens {
         if (module.startsWith("clips_viewer")) return Kind.REELS;
         if (module.startsWith("reel_")) return Kind.STORIES;
         if (module.startsWith("explore")) return Kind.EXPLORE;
-        // Search results, everything but the Accounts tab, and posts opened from them.
-        if (module.startsWith("serp_") && !module.startsWith("serp_users")) return Kind.EXPLORE;
+        // Search results and posts opened from them. Searching for people always works, so
+        // the tabs that list accounts stay open: Accounts, Not personalized, suggested accounts.
+        if (module.startsWith("serp_")) return isAccountList(module) ? null : Kind.EXPLORE;
         if (module.equals("feed_contextual_chain") || module.equals("feed_contextual_keyword")) return Kind.EXPLORE;
         // Your own posts and saved posts stay open.
         if (module.equals("feed_contextual_self_profile") || module.contains("saved")) return null;
@@ -187,6 +215,11 @@ final class GatedScreens {
             return Kind.FEEDS;
         }
         return null;
+    }
+
+    private static boolean isAccountList(String module) {
+        return module.startsWith("serp_users") || module.startsWith("serp_non_profiled")
+                || module.startsWith("serp_suggested_users") || module.contains("account");
     }
 
     private static boolean isEnabled(Kind kind) {
@@ -236,7 +269,8 @@ final class GatedScreens {
                 if (surface != null && isOnScreen(surface) && !contains(surface)) {
                     onScreen.add(new WeakReference<>(surface));
                     kinds.put(surface, kind);
-                    fragments.put(surface, fragment);
+                    fragments.put(surface, new WeakReference<>(fragment));
+                    roots.put(surface, new WeakReference<>(view));
                 }
             }
         }
@@ -406,6 +440,7 @@ final class GatedScreens {
         View primary = primary();
         Kind kind = primary == null ? null : kinds.get(primary);
         gate.setBadge(ConsciousGatePatch.badge(reason));
+        gate.setClosable(kind == Kind.STORIES);
         boolean closed = reason != Reason.OPEN;
         gate.setClosed(closed,
                 closed ? ConsciousGatePatch.title(reason, kind) : null,
@@ -423,7 +458,10 @@ final class GatedScreens {
         gate = null;
     }
 
-    /** Keeps the gate over the visible part of the gated surface, clear of the bars around it. */
+    /**
+     * Keeps the gate over the visible part of the gated surface and the bars under it, clear
+     * of the screen's header.
+     */
     private void syncGate() {
         try {
             if (gate == null || !(gate.getParent() instanceof ViewGroup)) return;
@@ -433,29 +471,46 @@ final class GatedScreens {
                 return;
             }
             surface.getGlobalVisibleRect(rect);
-            // Lists scroll under their screen's header; keep the header usable.
-            View header = header(kinds.get(surface));
-            if (header != null && header.isShown() && header.getGlobalVisibleRect(otherRect)
-                    && otherRect.top <= rect.top && otherRect.bottom > rect.top) {
-                rect.top = Math.min(rect.bottom, otherRect.bottom);
+            // Bars under the list, like the comment composer under a reel, are covered too.
+            View root = rootOf(surface);
+            if (root != null && root.getGlobalVisibleRect(otherRect) && otherRect.bottom > rect.bottom) {
+                rect.bottom = otherRect.bottom;
             }
-            View bar = tabBar();
-            if (bar != null && bar.isShown() && bar.getGlobalVisibleRect(otherRect) && otherRect.top < rect.bottom) {
-                rect.bottom = Math.max(rect.top, otherRect.top);
+            // Lists scroll under their screen's header; keep the header usable. Full screen
+            // viewers start it below the status bar, so it only has to sit near the top.
+            View header = header(surface);
+            if (header != null && header.isShown() && header.getGlobalVisibleRect(otherRect)
+                    && otherRect.bottom > rect.top && otherRect.top < rect.top + rect.height() / 4) {
+                rect.top = Math.min(rect.bottom, otherRect.bottom);
             }
             ViewGroup content = (ViewGroup) gate.getParent();
             content.getGlobalVisibleRect(otherRect);
             rect.offset(-otherRect.left, -otherRect.top);
+            // Sideways the gate spans the whole surface, not its visible part: while swiping
+            // to Create or Messages the screen slides off the side, and the gate slides with
+            // it (by translation, without a layout every frame) instead of being squeezed
+            // into the strip still showing.
+            surface.getLocationInWindow(surfaceLocation);
+            content.getLocationInWindow(contentLocation);
+            int surfaceLeft = surfaceLocation[0] - contentLocation[0];
+            rect.left = surfaceLeft;
+            rect.right = surfaceLeft + surface.getWidth();
 
+            // The floating tab bar sits over the bottom of the list, so the gate covers it all
+            // and only lets touches on the tabs through.
+            gate.setTabBar(tabBar());
             gate.setSurface(surface, isRecyclerView(surface));
             FrameLayout.LayoutParams params = (FrameLayout.LayoutParams) gate.getLayoutParams();
-            if (params.leftMargin != rect.left || params.topMargin != rect.top
+            if (params.topMargin != rect.top
                     || params.width != rect.width() || params.height != rect.height()) {
                 params.leftMargin = rect.left;
                 params.topMargin = rect.top;
                 params.width = rect.width();
                 params.height = rect.height();
                 gate.setLayoutParams(params);
+                gate.setTranslationX(0f);
+            } else {
+                gate.setTranslationX(rect.left - params.leftMargin);
             }
             gate.show();
         } catch (Throwable t) {
@@ -468,20 +523,36 @@ final class GatedScreens {
         return tabBar;
     }
 
+    private View rootOf(View surface) {
+        WeakReference<View> root = roots.get(surface);
+        return root == null ? null : root.get();
+    }
+
     /**
      * The header over a screen's surface: "For you" and its buttons on the home feed, the
      * search bar on Explore, the Reels and Friends tabs on Reels, the title of post feeds.
+     * The screen's own header comes first, then one around it, like the activity's action bar.
      */
-    private View header(Kind kind) {
+    private View header(View surface) {
+        Kind kind = kinds.get(surface);
         if (kind == null) return null;
-        View header = headers.get(kind);
+        WeakReference<View> cached = headers.get(surface);
+        View header = cached == null ? null : cached.get();
         if (header != null && header.isAttachedToWindow() && header.isShown()) return header;
+        // Looking means walking the screen, so a missing header isn't looked for every frame.
+        long now = SystemClock.uptimeMillis();
+        if (cached != null && now - headerSearch < ACTIVE_RESCAN_MS) return null;
+        headerSearch = now;
         header = null;
+        View root = rootOf(surface);
         for (String name : HEADER_IDS[kind.ordinal()]) {
-            header = findShownView(name);
+            int id = findId(name);
+            if (id == 0) continue;
+            if (root != null) header = findShownView(root, id);
+            if (header == null) header = findShownView(name);
             if (header != null) break;
         }
-        headers.put(kind, header);
+        headers.put(surface, new WeakReference<>(header));
         return header;
     }
 
@@ -539,18 +610,20 @@ final class GatedScreens {
             if (surface == null) continue;
             Kind kind = kinds.get(surface);
             if (kind != Kind.REELS && kind != Kind.STORIES) continue;
-            Object fragment = fragments.get(surface);
+            WeakReference<Object> fragmentRef = fragments.get(surface);
+            Object fragment = fragmentRef == null ? null : fragmentRef.get();
             if (fragment == null) continue;
-            long[] state = paused.get(fragment);
+            Paused state = paused.get(fragment);
             if (state != null) {
                 boolean playing = audio != null && audio.isMusicActive();
-                if (!playing || now - state[0] < REPAUSE_MS || state[1] >= MAX_PAUSES) continue;
+                if (!playing || now - state.at < REPAUSE_MS || state.count >= MAX_PAUSES) continue;
             } else {
-                state = new long[2];
+                state = new Paused();
                 paused.put(fragment, state);
             }
-            state[0] = now;
-            state[1]++;
+            state.at = now;
+            state.count++;
+            state.surface = new WeakReference<>(surface);
             try {
                 fragment.getClass().getMethod("onPause").invoke(fragment);
             } catch (Throwable t) {
@@ -559,10 +632,20 @@ final class GatedScreens {
         }
     }
 
+    /**
+     * Resumes the paused screens that are still showing. Ones closed since, or left on another
+     * tab, aren't: Instagram has paused or torn them down itself by then, and resumes them when
+     * they come back, while resuming a closed one crashes.
+     */
     private void resumeMedia() {
         if (paused.isEmpty()) return;
-        for (Object fragment : new ArrayList<>(paused.keySet())) {
-            if (fragment == null) continue;
+        for (Map.Entry<Object, Paused> entry : new ArrayList<>(paused.entrySet())) {
+            Object fragment = entry.getKey();
+            View surface = entry.getValue().surface.get();
+            if (fragment == null || surface == null || !surface.isAttachedToWindow() || !surface.isShown()
+                    || !lifecycleIs(fragment, "isAdded") || !lifecycleIs(fragment, "isResumed")) {
+                continue;
+            }
             try {
                 fragment.getClass().getMethod("onResume").invoke(fragment);
             } catch (Throwable t) {
@@ -570,6 +653,17 @@ final class GatedScreens {
             }
         }
         paused.clear();
+    }
+
+    /** Asks the fragment, e.g. isAdded(); true if it can't be asked, as its view already showed it's alive. */
+    private static boolean lifecycleIs(Object fragment, String method) {
+        try {
+            return Boolean.TRUE.equals(fragment.getClass().getMethod(method).invoke(fragment));
+        } catch (NoSuchMethodException e) {
+            return true;
+        } catch (Throwable t) {
+            return false;
+        }
     }
 
     // endregion

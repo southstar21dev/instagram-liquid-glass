@@ -55,10 +55,20 @@ public final class PatchSettings {
      */
     public PatchSettings(String key, String title, String description, Callable<Boolean> included,
                          SettingsGroup... groups) {
+        this(key, title, description, included, true, groups);
+    }
+
+    /**
+     * @param enabledByDefault whether the patch is switched on until the user changes it; off
+     *                         for patches that change how the app is used, which the user
+     *                         should choose to turn on
+     */
+    public PatchSettings(String key, String title, String description, Callable<Boolean> included,
+                         boolean enabledByDefault, SettingsGroup... groups) {
         this.title = title;
         this.description = description;
         this.included = included;
-        this.enabled = new BooleanSetting(key + "_enabled", "Enabled", null, true, true);
+        this.enabled = new BooleanSetting(key + "_enabled", "Enabled", null, true, enabledByDefault);
         List<Setting> all = new ArrayList<>();
         List<SettingsGroup> list = new ArrayList<>();
         for (SettingsGroup group : groups) {

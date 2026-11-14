@@ -48,6 +48,7 @@ public final class ConsciousGatePatch {
     private static final long MAX_TICK_GAP_MS = 2000;
     private static final long SAVE_EVERY_MS = 5000;
     private static final long MINUTE_MS = 60_000;
+    private static final int DAY_MINUTES = 24 * 60;
     /** The last part of the budget, as the screens frost over and can only be scrolled. */
     private static final long FROST_MS = 15_000;
 
@@ -107,6 +108,8 @@ public final class ConsciousGatePatch {
             "A daily time budget for the home feed, Reels, Explore and stories. Near the end they frost over "
                     + "and can only be scrolled, then a gate closes them until the next day.",
             ConsciousGatePatch::isIncluded,
+            // Off until the user turns it on: it closes parts of the app.
+            false,
             new SettingsGroup("Gated screens",
                     "Searching for people, messages and profiles always work.",
                     GATE_HOME, GATE_REELS, GATE_EXPLORE, GATE_STORIES, GATE_FEEDS),
@@ -148,6 +151,7 @@ public final class ConsciousGatePatch {
 
     private static final String STATE_PREFERENCES = "southstar21_conscious_gate";
     private static final String KEY_DAY = "day";
+    private static final String KEY_DAY_START = "day_start";
     private static final String KEY_USED = "used_ms";
     private static final String KEY_EXTRA_COUNT = "extra_count";
     private static final String KEY_EXTRA_MS = "extra_ms";
@@ -156,6 +160,8 @@ public final class ConsciousGatePatch {
 
     private static SharedPreferences state;
     private static String day;
+    /** The "New day starts at" hour {@link #day} was worked out with, or -1 if not known. */
+    private static int dayStartHour = -1;
     /** Time used on the gated screens today. */
     private static long usedMs;
     /** Extra time taken today: how often, how much in total, and the last amount. */
@@ -170,6 +176,7 @@ public final class ConsciousGatePatch {
         if (state != null) return;
         state = context.getApplicationContext().getSharedPreferences(STATE_PREFERENCES, Context.MODE_PRIVATE);
         day = state.getString(KEY_DAY, null);
+        dayStartHour = state.getInt(KEY_DAY_START, -1);
         usedMs = state.getLong(KEY_USED, 0);
         extraCount = state.getInt(KEY_EXTRA_COUNT, 0);
         extraMs = state.getLong(KEY_EXTRA_MS, 0);
@@ -180,18 +187,30 @@ public final class ConsciousGatePatch {
 
     /** Now, moved back by the day start, so the small hours count towards the day before. */
     private static Calendar budgetDay() {
+        return budgetDay(DAY_START.get());
+    }
+
+    private static Calendar budgetDay(int startHour) {
         Calendar calendar = Calendar.getInstance();
-        calendar.add(Calendar.HOUR_OF_DAY, -DAY_START.get());
+        calendar.add(Calendar.HOUR_OF_DAY, -startHour);
         return calendar;
     }
 
-    private static String today() {
-        return new SimpleDateFormat("yyyy-MM-dd", Locale.US).format(budgetDay().getTime());
+    private static String today(int startHour) {
+        return new SimpleDateFormat("yyyy-MM-dd", Locale.US).format(budgetDay(startHour).getTime());
     }
 
     /** Starts a fresh budget when the day changes. */
     private static void rollOverDay() {
-        String today = today();
+        int start = DAY_START.get();
+        if (start != dayStartHour) {
+            // Moving the day start isn't a new day: if it was still today by the old start,
+            // today's time carries over, rather than starting again from nothing.
+            if (dayStartHour >= 0 && day != null && day.equals(today(dayStartHour))) day = today(start);
+            dayStartHour = start;
+            save();
+        }
+        String today = today(start);
         if (today.equals(day)) return;
         day = today;
         clearToday();
@@ -211,6 +230,7 @@ public final class ConsciousGatePatch {
         lastSave = SystemClock.uptimeMillis();
         state.edit()
                 .putString(KEY_DAY, day)
+                .putInt(KEY_DAY_START, dayStartHour)
                 .putLong(KEY_USED, usedMs)
                 .putInt(KEY_EXTRA_COUNT, extraCount)
                 .putLong(KEY_EXTRA_MS, extraMs)
@@ -224,13 +244,13 @@ public final class ConsciousGatePatch {
         return weekday == Calendar.SATURDAY || weekday == Calendar.SUNDAY;
     }
 
-    static long budgetMs() {
-        int minutes = isWeekend() ? WEEKEND_MINUTES.get() : WEEKDAY_MINUTES.get();
-        return minutes * MINUTE_MS + extraMs;
+    /** Today's allowance, without extra time. */
+    static int allowanceMinutes() {
+        return isWeekend() ? WEEKEND_MINUTES.get() : WEEKDAY_MINUTES.get();
     }
 
-    static int budgetMinutes() {
-        return (int) (budgetMs() / MINUTE_MS);
+    static long budgetMs() {
+        return allowanceMinutes() * MINUTE_MS + extraMs;
     }
 
     static long remainingMs() {
@@ -259,11 +279,24 @@ public final class ConsciousGatePatch {
     }
 
     static Reason reason() {
-        Calendar now = Calendar.getInstance();
-        int minute = now.get(Calendar.HOUR_OF_DAY) * 60 + now.get(Calendar.MINUTE);
-        if (QUIET_HOURS.get() && inRange(minute, QUIET_FROM.get(), QUIET_UNTIL.get())) return Reason.QUIET_HOURS;
-        if (MORNING_START.get() && inRange(minute, DAY_START.get() * 60, MORNING_TIME.get())) return Reason.MORNING;
+        Reason scheduled = scheduled(minuteNow());
+        if (scheduled != Reason.OPEN) return scheduled;
         return usedMs >= budgetMs() ? Reason.BUDGET : Reason.OPEN;
+    }
+
+    private static int minuteNow() {
+        Calendar now = Calendar.getInstance();
+        return now.get(Calendar.HOUR_OF_DAY) * 60 + now.get(Calendar.MINUTE);
+    }
+
+    /** Whether quiet hours or the morning start keep the screens closed at {@code minute} of the day. */
+    private static Reason scheduled(int minute) {
+        if (QUIET_HOURS.get() && inRange(minute, QUIET_FROM.get(), QUIET_UNTIL.get())) return Reason.QUIET_HOURS;
+        // The morning runs from the start of the new day. A time before the day start has
+        // passed by the time the day begins, so it closes nothing, rather than wrapping round.
+        int dayStart = DAY_START.get() * 60;
+        if (MORNING_START.get() && minute >= dayStart && minute < MORNING_TIME.get()) return Reason.MORNING;
+        return Reason.OPEN;
     }
 
     /** Whether {@code minute} of the day is in [from, until), which may wrap past midnight. */
@@ -272,17 +305,39 @@ public final class ConsciousGatePatch {
         return from < until ? minute >= from && minute < until : minute >= from || minute < until;
     }
 
-    /** When the gated screens open again, in minutes of the day, for the gate's text. */
-    static int reopensAt(Reason reason) {
-        switch (reason) {
-            case QUIET_HOURS:
-                return QUIET_UNTIL.get();
-            case MORNING:
-                return MORNING_TIME.get();
-            default:
-                int dayStart = DAY_START.get() * 60;
-                return MORNING_START.get() ? Math.max(dayStart, MORNING_TIME.get()) : dayStart;
+    /**
+     * When the gated screens open again, in minutes of the day, for the gate's text: the first
+     * time quiet hours and the morning start both allow, and with the budget used up, not
+     * before the new day starts.
+     */
+    static int reopensAt() {
+        int now = minuteNow();
+        int dayStart = DAY_START.get() * 60;
+        boolean waitForNewDay = usedMs >= budgetMs();
+        // They can only open as a new day starts or a closed stretch ends.
+        int[] candidates = {
+                dayStart,
+                QUIET_HOURS.get() ? QUIET_UNTIL.get() : -1,
+                MORNING_START.get() ? MORNING_TIME.get() : -1,
+        };
+        int best = dayStart;
+        int bestWait = Integer.MAX_VALUE;
+        for (int at : candidates) {
+            if (at < 0) continue;
+            int wait = minutesUntil(now, at);
+            if (waitForNewDay && wait < minutesUntil(now, dayStart)) continue;
+            if (wait < bestWait && scheduled(at) == Reason.OPEN) {
+                best = at;
+                bestWait = wait;
+            }
         }
+        return best;
+    }
+
+    /** Minutes from {@code now} until the clock next shows {@code at}, a whole day if it's now. */
+    private static int minutesUntil(int now, int at) {
+        int wait = ((at - now) % DAY_MINUTES + DAY_MINUTES) % DAY_MINUTES;
+        return wait == 0 ? DAY_MINUTES : wait;
     }
 
     /**
@@ -329,7 +384,7 @@ public final class ConsciousGatePatch {
     }
 
     static String body(Reason reason) {
-        String opens = TimeSetting.format(reopensAt(reason));
+        String opens = TimeSetting.format(reopensAt());
         String first;
         switch (reason) {
             case QUIET_HOURS:
@@ -339,26 +394,28 @@ public final class ConsciousGatePatch {
                 first = "Feeds, Reels, stories and Explore open at " + opens + ".";
                 break;
             default:
-                first = "You've had your " + budgetMinutes() + " minutes. They open again at " + opens + ".";
+                long extra = extraMs / MINUTE_MS;
+                String had = allowanceMinutes() + " minutes"
+                        + (extra > 0 ? " and " + extra + " extra minute" + (extra == 1 ? "" : "s") : "");
+                first = "You've had your " + had + ". They open again at " + opens + ".";
                 break;
         }
         return first + "\nSearching for people, messages and profiles still work.";
     }
 
-    /** The text of the badge on the gated screens. */
+    /**
+     * The text of the badge on the gated screens. It only shows from the frost on, so while
+     * they're open it counts down the last seconds.
+     */
     static String badge(Reason reason) {
         String active = "Conscious gate active";
         switch (reason) {
-            case OPEN: {
-                long left = remainingMs();
-                if (left < MINUTE_MS) return active + ": under a minute left";
-                long minutes = (left + MINUTE_MS - 1) / MINUTE_MS;
-                return active + ": " + minutes + " min left";
-            }
+            case OPEN:
+                return active + ": " + (remainingMs() + 999) / 1000 + " s left";
             case QUIET_HOURS:
                 return active + ": quiet hours";
             case MORNING:
-                return active + ": opens at " + TimeSetting.format(MORNING_TIME.get());
+                return active + ": opens at " + TimeSetting.format(reopensAt());
             default:
                 return active;
         }
@@ -427,6 +484,20 @@ public final class ConsciousGatePatch {
 
     private static boolean watchingActivities;
 
+    /**
+     * Whether the patch was switched off in the menu. If so, the gates come off right away and
+     * nothing is counted, until it's switched back on and {@link InstagramHooks} starts it again.
+     */
+    private static boolean switchedOff() {
+        if (SETTINGS.isActive()) return false;
+        handler.removeCallbacks(tick);
+        for (GatedScreens screens : screensByActivity.values()) {
+            if (screens != null) screens.thaw();
+        }
+        save();
+        return true;
+    }
+
     /** Called by {@link InstagramHooks} when this patch is switched on. */
     public static void onMainActivityFocusChanged(Activity activity) {
         try {
@@ -450,7 +521,7 @@ public final class ConsciousGatePatch {
             @Override
             public void onActivityResumed(Activity resumed) {
                 try {
-                    follow(resumed);
+                    if (!switchedOff()) follow(resumed);
                 } catch (Throwable t) {
                     Log.e(TAG, "Failed to follow activity", t);
                 }
@@ -464,12 +535,15 @@ public final class ConsciousGatePatch {
             public void onActivityStarted(Activity a) {
             }
 
+            // Saved as soon as Instagram leaves the screen, in case it's killed in the background.
             @Override
             public void onActivityPaused(Activity a) {
+                save();
             }
 
             @Override
             public void onActivityStopped(Activity a) {
+                save();
             }
 
             @Override
@@ -503,6 +577,7 @@ public final class ConsciousGatePatch {
 
     private static void tick() {
         try {
+            if (switchedOff()) return;
             Activity activity = activityRef.get();
             if (activity == null || activity.isDestroyed()) return;
             GatedScreens screens = screensByActivity.get(activity);
